@@ -263,6 +263,24 @@ body{display:flex;flex-direction:column;height:100%}
   .presentation-mode .compare-view .side{width:400px}
   .patient-card:hover{box-shadow:var(--shadow-md)}
 }
+.case-view-toggle{padding:8px 16px;border-radius:8px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);color:#fff;cursor:pointer;font-size:13px;font-family:inherit;margin-right:8px}
+.case-view-toggle.doctor{background:var(--primary);border-color:var(--primary)}
+.case-slide-private-badge{display:inline-block;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,.2);color:#FCA5A5;font-size:11px;margin-left:6px}
+.case-empty-node{padding:40px;text-align:center;opacity:.5;font-size:13px}
+.case-empty-icon{font-size:40px;margin-bottom:8px;opacity:.5}
+.followup-todo-item{background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:14px;margin:8px 0}
+.followup-todo-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.followup-todo-title{font-size:14px;font-weight:600;color:#991B1B}
+.followup-todo-date{font-size:11px;color:#7F1D1D}
+.followup-todo-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.followup-todo-btn{padding:6px 12px;border-radius:6px;border:none;font-size:12px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .2s}
+.followup-todo-btn.called{background:#D1FAE5;color:#065F46}
+.followup-todo-btn.no-answer{background:#FEF3C7;color:#92400E}
+.followup-todo-btn.appointed{background:#DBEAFE;color:#1E40AF}
+.followup-todo-btn:active{transform:scale(.96)}
+.todo-section-title{font-size:14px;font-weight:600;color:#991B1B;padding:0 16px 4px;display:flex;align-items:center;gap:6px}
+.todo-section-title .badge{position:static;transform:none;margin-left:4px}
+.compare-active-state{display:none}
 </style>
 </head>
 <body>
@@ -365,6 +383,9 @@ body{display:flex;flex-direction:column;height:100%}
       <div class="filter-tab" data-status="已过期" onclick="filterReminders(this)">已过期</div>
       <div class="filter-tab" data-status="已完成" onclick="filterReminders(this)">已完成</div>
     </div>
+    <div class="todo-section-title">📋 待办事项 <div class="badge" id="todoCountBadge">0</div></div>
+    <div id="todoSection" style="padding:0 16px;"></div>
+    <div class="section-title" style="padding-top:12px;">复诊提醒</div>
     <div id="remindersList"></div>
     <button class="fab" onclick="openAddReminder()">
       <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -574,7 +595,10 @@ body{display:flex;flex-direction:column;height:100%}
 <div class="case-presentation" id="casePresentation">
   <div class="case-pres-header">
     <div></div>
-    <button class="case-pres-close" onclick="closeCasePresentation()">退出讲解</button>
+    <div>
+      <button class="case-view-toggle" id="caseViewToggle" onclick="toggleCaseView()">医生视图</button>
+      <button class="case-pres-close" onclick="closeCasePresentation()">退出讲解</button>
+    </div>
   </div>
   <div class="case-pres-info">
     <h3 id="casePresName"></h3>
@@ -671,12 +695,18 @@ var currentDay=7;
 var noteFilter='all';
 var reminderFilter='all';
 var sliderPos=50;
+var caseViewMode='client';
+var currentSliderPos=50;
+var currentOverlayOpacity=50;
+var todoStatuses={};
 var savedNotes=localStorage.getItem('mh_notes');
 if(savedNotes)try{notes=JSON.parse(savedNotes)}catch(e){}
 var savedReminders=localStorage.getItem('mh_reminders');
 if(savedReminders)try{reminders=JSON.parse(savedReminders)}catch(e){}
 var savedStatuses=localStorage.getItem('mh_patient_statuses');
 if(savedStatuses)try{var sm=JSON.parse(savedStatuses);patients.forEach(function(p){if(sm[p.id])p.status=sm[p.id]})}catch(e){}
+var savedTodos=localStorage.getItem('mh_todo_statuses');
+if(savedTodos)try{todoStatuses=JSON.parse(savedTodos)}catch(e){}
 
 var pageTitles={pagePatients:'我的患者',pageTimeline:'疗程时间线',pageCompare:'拍摄对比',pageNotes:'医嘱备注',pageReminders:'复诊提醒',pagePrivacy:'隐私设置'};
 
@@ -691,7 +721,7 @@ function switchPage(el){
   if(page==='pageTimeline')renderTimeline();
   if(page==='pageCompare')renderCompare();
   if(page==='pageNotes')renderNotes();
-  if(page==='pageReminders')renderReminders();
+  if(page==='pageReminders'){renderReminders();renderTodos();}
 }
 
 function getStatusClass(s){
@@ -845,21 +875,23 @@ function renderCompare(){
   var html='';
   if(compareMode==='slider'){
     html+='<div class="compare-area"><div class="compare-img-container" id="sliderContainer">'+
-      '<div class="img-after" style="clip:rect(0,'+sliderPos+'%,100%,0)"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
+      '<div class="img-after" style="clip:rect(0,'+currentSliderPos+'%,100%,0)"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
       '<div class="img-before"><span class="img-label" style="left:8px">术前 D0</span></div>'+
-      '<div class="slider-line" id="sliderLine" style="left:'+sliderPos+'%"></div>'+
-      '<div class="slider-handle" id="sliderHandle" style="left:'+sliderPos+'%">'+
+      '<div class="slider-line" id="sliderLine" style="left:'+currentSliderPos+'%"></div>'+
+      '<div class="slider-handle" id="sliderHandle" style="left:'+currentSliderPos+'%">'+
         '<svg viewBox="0 0 24 24"><path d="M8 5l-5 7 5 7zm8 0l5 7-5 7z"/></svg>'+
       '</div>'+
       '<div class="magnifier-lens" id="magnifierLens"></div>'+
     '</div></div>';
   }else if(compareMode==='overlay'){
+    var beforeOpacity=(100-currentOverlayOpacity)/100;
+    var afterOpacity=currentOverlayOpacity/100;
     html+='<div class="compare-area"><div class="compare-img-container">'+
-      '<div class="img-before" style="opacity:0.5"><span class="img-label" style="left:8px">术前 D0</span></div>'+
-      '<div class="img-after" style="opacity:0.5"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
+      '<div class="img-before" style="opacity:'+beforeOpacity+'"><span class="img-label" style="left:8px">术前 D0</span></div>'+
+      '<div class="img-after" style="opacity:'+afterOpacity+'"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
       '<div class="magnifier-lens" id="magnifierLens"></div>'+
     '</div>'+
-    '<div class="opacity-control"><span>术前</span><input type="range" min="0" max="100" value="50" id="opacitySlider" oninput="updateOverlay(this)"><span>术后</span></div></div>';
+    '<div class="opacity-control"><span>术前</span><input type="range" min="0" max="100" value="'+currentOverlayOpacity+'" id="opacitySlider" oninput="updateOverlay(this)"><span>术后</span></div></div>';
   }else{
     html+='<div class="side-by-side">'+
       '<div class="side before-side"><span class="side-label">术前 D0</span>术前<div class="magnifier-lens" id="magnifierLensBefore"></div></div>'+
@@ -872,7 +904,8 @@ function renderCompare(){
 }
 
 function updateOverlay(el){
-  var v=el.value;
+  var v=parseInt(el.value);
+  currentOverlayOpacity=v;
   var container=el.closest('.compare-area');
   var before=container.querySelector('.img-before');
   var after=container.querySelector('.img-after');
@@ -890,7 +923,7 @@ function initSlider(){
   function onMove(x){
     var rect=container.getBoundingClientRect();
     var p=Math.max(0,Math.min(100,((x-rect.left)/rect.width)*100));
-    sliderPos=p;
+    currentSliderPos=p;
     handle.style.left=p+'%';
     line.style.left=p+'%';
     afterImg.style.clipPath='inset(0 '+(100-p)+'% 0 0)';
@@ -933,31 +966,34 @@ function doMag(cx,cy,container){
   var x=cx-rect.left;
   var y=cy-rect.top;
   if(x<0||x>rect.width||y<0||y>rect.height){lens.style.display='none';return}
+  var lensSize=120;
+  var zoom=2.5;
   lens.style.display='block';
-  lens.style.left=(x-60)+'px';
-  lens.style.top=(y-60)+'px';
-  var bg='linear-gradient(135deg,#059669,#34D399)';
-  if(container.classList.contains('before-side')||container.classList.contains('img-before')){bg='linear-gradient(135deg,#4338CA,#6366F1)'}
+  lens.style.left=(x-lensSize/2)+'px';
+  lens.style.top=(y-lensSize/2)+'px';
+  var BEFORE_GRADIENT='linear-gradient(135deg,#4338CA,#6366F1)';
+  var AFTER_GRADIENT='linear-gradient(135deg,#059669,#34D399)';
+  var bg=AFTER_GRADIENT;
+  if(container.classList.contains('before-side')||container.classList.contains('img-before')){bg=BEFORE_GRADIENT}
   if(compareMode==='slider'&&lensId==='magnifierLens'){
-    var pct=x/rect.width*100;
-    bg=pct<sliderPos?'linear-gradient(135deg,#059669,#34D399)':'linear-gradient(135deg,#4338CA,#6366F1)';
+    var sliderLeft=currentSliderPos/100*rect.width;
+    if(x<sliderLeft){bg=BEFORE_GRADIENT}else{bg=AFTER_GRADIENT}
   }
   if(compareMode==='overlay'&&lensId==='magnifierLens'){bg='linear-gradient(135deg,#4338CA,#34D399)'}
   lens.style.background=bg;
-  lens.style.backgroundSize=(rect.width*2.5)+'px '+(rect.height*2.5)+'px';
-  lens.style.backgroundPosition=(-(x*2.5-60))+'px '+(-(y*2.5-60))+'px';
+  lens.style.backgroundSize=(rect.width*zoom)+'px '+(rect.height*zoom)+'px';
+  var bgX=-(x*zoom-lensSize/2);
+  var bgY=-(y*zoom-lensSize/2);
+  lens.style.backgroundPosition=bgX+'px '+bgY+'px';
   lens.style.backgroundRepeat='no-repeat';
 }
 
 var magnifierOn=false;
 function toggleMagnifier(el){
-  el.classList.toggle('on');
-  magnifierOn=el.classList.contains('on');
-  if(!magnifierOn){
-    var lens=document.getElementById('magnifierLens');
-    if(lens)lens.style.display='none';
-  }
+  magnifierOn=!magnifierOn;
+  if(el)el.classList.toggle('on',magnifierOn);
   initMagnifier();
+  if(!magnifierOn)hideMag();
   showToast(magnifierOn?'放大镜已开启 · 在照片上拖动查看细节':'放大镜已关闭');
 }
 function toggleCond(el){el.classList.toggle('active');showToast(el.classList.contains('active')?'已标记: '+el.dataset.cond:'已取消: '+el.dataset.cond)}
@@ -970,6 +1006,7 @@ function quickMark(msg){
   renderPatients();
   if(document.getElementById('patientDetail').classList.contains('open')){openDetail(p.id)}
   renderReminders();
+  renderTodos();
   showToast(p.name+' 已标记为: '+msg);
 }
 
@@ -1007,6 +1044,7 @@ function filterNotes(el){
 }
 
 function renderReminders(){
+  renderTodos();
   var filtered=reminders.filter(function(r){
     return reminderFilter==='all'||r.status===reminderFilter;
   });
@@ -1074,11 +1112,7 @@ function saveNote(){
 }
 
 function openAddReminder(){
-  var sel=document.getElementById('reminderPatient');
-  sel.innerHTML=patients.map(function(p){return'<option value="'+p.name+'">'+p.name+'</option>'}).join('');
-  sel.value=currentPatient.name;
-  document.getElementById('reminderModalOverlay').classList.add('open');
-  document.getElementById('reminderModal').classList.add('open');
+  showAddReminder();
 }
 function closeAddReminder(){
   document.getElementById('reminderModalOverlay').classList.remove('open');
@@ -1111,9 +1145,34 @@ function togglePrivacy(el){el.classList.toggle('on')}
 
 var caseSlideIdx=0;
 var caseAutoTimer=null;
+
+function getFilteredTimeline(p){
+  var keyDays=[0,7,30];
+  return keyDays.map(function(d){
+    var node=p.timeline.find(function(n){return n.day===d});
+    return node || {day:d,date:'',label:(d===0?'术前':'D'+d+' · 待复诊'),tags:[],note:'',photoCount:0,empty:true};
+  });
+}
+
+function toggleCaseView(){
+  caseViewMode=caseViewMode==='client'?'doctor':'client';
+  var btn=document.getElementById('caseViewToggle');
+  if(btn){
+    btn.textContent=caseViewMode==='client'?'医生视图':'客户视图';
+    btn.classList.toggle('doctor',caseViewMode==='doctor');
+  }
+  renderCaseSlide();
+}
+
 function openCasePresentation(){
   closeDetail();
   caseSlideIdx=0;
+  caseViewMode='client';
+  var btn=document.getElementById('caseViewToggle');
+  if(btn){
+    btn.textContent='医生视图';
+    btn.classList.remove('doctor');
+  }
   renderCaseSlide();
   document.getElementById('casePresentation').classList.add('open');
 }
@@ -1123,35 +1182,116 @@ function closeCasePresentation(){
 }
 function renderCaseSlide(){
   var p=currentPatient;
-  var tl=p.timeline;
+  var tl=getFilteredTimeline(p);
   var s=tl[caseSlideIdx];
   if(!s)return;
   document.getElementById('casePresName').textContent=p.name;
   document.getElementById('casePresProject').textContent=p.project+' · 疗程进展';
-  var h='<div class="case-slide-date">'+s.date+' · Day '+s.day+'</div>';
-  h+='<div class="case-slide-label">'+s.label+'</div>';
-  h+='<div class="case-slide-photos">';
-  h+='<div class="case-slide-photo front">正面</div>';
-  h+='<div class="case-slide-photo deg45">45°</div>';
-  h+='<div class="case-slide-photo deg90">90°</div>';
-  h+='</div>';
-  h+='<div class="case-slide-tags">'+s.tags.map(function(t){return'<span>'+t+'</span>'}).join('')+'</div>';
-  if(s.note){h+='<div class="case-slide-note">'+s.note+'</div>'}
-  else{h+='<div class="case-slide-private">暂无备注</div>'}
+  var h='';
+  if(s.empty){
+    h+='<div class="case-slide-date">Day '+s.day+'</div>';
+    h+='<div class="case-slide-label">'+s.label+'</div>';
+    h+='<div class="case-empty-node"><div class="case-empty-icon">📷</div>暂无该节点照片</div>';
+  }else{
+    h+='<div class="case-slide-date">'+s.date+' · Day '+s.day+'</div>';
+    h+='<div class="case-slide-label">'+s.label+'</div>';
+    h+='<div class="case-slide-photos">';
+    h+='<div class="case-slide-photo front">正面</div>';
+    h+='<div class="case-slide-photo deg45">45°</div>';
+    h+='<div class="case-slide-photo deg90">90°</div>';
+    h+='</div>';
+    if(caseViewMode==='doctor'){
+      h+='<div class="case-slide-tags">'+s.tags.map(function(t){return'<span>'+t+'</span>'}).join('')+'</div>';
+    }
+    if(s.note){
+      var isPrivate=s.tags&&s.tags.indexOf('私密')>=0;
+      if(caseViewMode==='client'&&isPrivate){
+      }else{
+        h+='<div class="case-slide-note">'+s.note;
+        if(caseViewMode==='doctor'&&isPrivate){
+          h+='<span class="case-slide-private-badge">🔒 私密</span>';
+        }
+        h+='</div>';
+      }
+    }else{
+      h+='<div class="case-slide-private">暂无备注</div>';
+    }
+  }
   document.getElementById('caseSlideContent').innerHTML=h;
   document.getElementById('casePrevBtn').disabled=caseSlideIdx===0;
   document.getElementById('caseNextBtn').disabled=caseSlideIdx===tl.length-1;
   var dots='';
   tl.forEach(function(_,i){dots+='<div class="case-pres-dot'+(i===caseSlideIdx?' active':'')+'" onclick="goCaseSlide('+i+')"></div>'});
   document.getElementById('caseDots').innerHTML=dots;
+  var privacyText=document.querySelector('.case-pres-privacy');
+  if(privacyText){
+    privacyText.textContent=caseViewMode==='client'?'🔒 适合展示内容 · 私密备注已隐藏':'👨‍⚕️ 医生视图 · 全部内容可见';
+  }
 }
-function caseNext(){if(caseSlideIdx<currentPatient.timeline.length-1){caseSlideIdx++;renderCaseSlide()}}
+function caseNext(){if(caseSlideIdx<getFilteredTimeline(currentPatient).length-1){caseSlideIdx++;renderCaseSlide()}}
 function casePrev(){if(caseSlideIdx>0){caseSlideIdx--;renderCaseSlide()}}
 function goCaseSlide(i){caseSlideIdx=i;renderCaseSlide()}
 function toggleCaseAutoPlay(){
   var btn=document.getElementById('caseAutoPlayBtn');
   if(caseAutoTimer){clearInterval(caseAutoTimer);caseAutoTimer=null;btn.textContent='▶ 自动播放';btn.classList.remove('playing')}
-  else{caseAutoTimer=setInterval(function(){if(caseSlideIdx<currentPatient.timeline.length-1){caseSlideIdx++;renderCaseSlide()}else{clearInterval(caseAutoTimer);caseAutoTimer=null;document.getElementById('caseAutoPlayBtn').textContent='▶ 自动播放';document.getElementById('caseAutoPlayBtn').classList.remove('playing')}},3000);btn.textContent='⏸ 暂停播放';btn.classList.add('playing')}
+  else{caseAutoTimer=setInterval(function(){if(caseSlideIdx<getFilteredTimeline(currentPatient).length-1){caseSlideIdx++;renderCaseSlide()}else{clearInterval(caseAutoTimer);caseAutoTimer=null;document.getElementById('caseAutoPlayBtn').textContent='▶ 自动播放';document.getElementById('caseAutoPlayBtn').classList.remove('playing')}},3000);btn.textContent='⏸ 暂停播放';btn.classList.add('playing')}
+}
+
+function renderTodos(){
+  var todoPatients=patients.filter(function(p){return p.status==='需回访'});
+  var todoSection=document.getElementById('todoSection');
+  if(!todoSection)return;
+  if(todoPatients.length===0){todoSection.innerHTML='<p style="padding:0 16px;color:var(--gray-400);font-size:13px;">暂无待办事项</p>';return}
+  var h='';
+  todoPatients.forEach(function(p){
+    var lastTimeline=p.timeline[p.timeline.length-1];
+    var days=lastTimeline?lastTimeline.day:0;
+    var notes=lastTimeline&&lastTimeline.note?lastTimeline.note:'需电话回访确认恢复情况';
+    h+='<div class="followup-todo-item">';
+    h+='<div class="followup-todo-header">';
+    h+='<span class="followup-todo-title">'+p.name+' · '+p.project+'</span>';
+    h+='<span class="followup-todo-date">D'+days+'</span>';
+    h+='</div>';
+    h+='<p style="font-size:12px;color:#7F1D1D;margin-bottom:4px;">'+notes+'</p>';
+    if(todoStatuses[p.id]==='no-answer'){h+='<p style="font-size:11px;color:#B45309;">⏱ 上次呼叫未接通</p>'}
+    h+='<div class="followup-todo-actions">';
+    h+='<button class="followup-todo-btn called" onclick="handleTodoAction('+p.id+',\'called\')">✓ 已联系</button>';
+    h+='<button class="followup-todo-btn no-answer" onclick="handleTodoAction('+p.id+',\'no-answer\')">📞 未接通</button>';
+    h+='<button class="followup-todo-btn appointed" onclick="handleTodoAction('+p.id+',\'appointed\')">📅 已预约复诊</button>';
+    h+='</div></div>';
+  });
+  todoSection.innerHTML=h;
+  var badge=document.getElementById('todoCountBadge');
+  if(badge)badge.textContent=todoPatients.length;
+}
+
+function handleTodoAction(pid,action){
+  var p=patients.find(function(x){return x.id===pid});
+  if(!p)return;
+  if(action==='called'){p.status='正常';delete todoStatuses[pid]}
+  else if(action==='no-answer'){todoStatuses[pid]='no-answer'}
+  else if(action==='appointed'){
+    p.status='即将复诊';
+    document.getElementById('reminderPatient').value=p.name;
+    delete todoStatuses[pid];
+    showAddReminder();
+  }
+  localStorage.setItem('mh_todo_statuses',JSON.stringify(todoStatuses));
+  var statusMap={};patients.forEach(function(pp){statusMap[pp.id]=pp.status});
+  localStorage.setItem('mh_patient_statuses',JSON.stringify(statusMap));
+  renderPatients();renderTodos();renderReminders();
+  if(document.getElementById('patientDetail').classList.contains('open')){openDetail(pid)}
+  if(action==='called')showToast(p.name+' 已标记: 已联系完成');
+  else if(action==='no-answer')showToast('已记录未接通，稍后重拨');
+  else if(action==='appointed')showToast('请选择复诊日期');
+}
+
+function showAddReminder(){
+  var sel=document.getElementById('reminderPatient');
+  sel.innerHTML=patients.map(function(p){return'<option value="'+p.name+'">'+p.name+'</option>'}).join('');
+  sel.value=currentPatient.name;
+  document.getElementById('reminderModalOverlay').classList.add('open');
+  document.getElementById('reminderModal').classList.add('open');
 }
 
 function showToast(msg){
@@ -1164,6 +1304,7 @@ function showToast(msg){
 renderPatients();
 renderNotes();
 renderReminders();
+renderTodos();
 </script>
 </body>
 </html>
