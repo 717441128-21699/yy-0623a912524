@@ -699,6 +699,7 @@ var caseViewMode='client';
 var currentSliderPos=50;
 var currentOverlayOpacity=50;
 var todoStatuses={};
+var pendingReminderPatient=null;
 var savedNotes=localStorage.getItem('mh_notes');
 if(savedNotes)try{notes=JSON.parse(savedNotes)}catch(e){}
 var savedReminders=localStorage.getItem('mh_reminders');
@@ -874,15 +875,24 @@ function renderCompare(){
   buildPatientChipsSimple('comparePatientChips','compare');
   var html='';
   if(compareMode==='slider'){
-    html+='<div class="compare-area"><div class="compare-img-container" id="sliderContainer">'+
-      '<div class="img-after" style="clip:rect(0,'+currentSliderPos+'%,100%,0)"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
-      '<div class="img-before"><span class="img-label" style="left:8px">术前 D0</span></div>'+
-      '<div class="slider-line" id="sliderLine" style="left:'+currentSliderPos+'%"></div>'+
-      '<div class="slider-handle" id="sliderHandle" style="left:'+currentSliderPos+'%">'+
-        '<svg viewBox="0 0 24 24"><path d="M8 5l-5 7 5 7zm8 0l5 7-5 7z"/></svg>'+
-      '</div>'+
-      '<div class="magnifier-lens" id="magnifierLens"></div>'+
-    '</div></div>';
+    var sliderHtml =
+      '<div class="compare-img-container" id="sliderContainer" style="position:relative;width:100%;aspect-ratio:4/5;border-radius:12px;overflow:hidden;">'
+      + '<div class="img-before" style="position:absolute;inset:0;background:linear-gradient(135deg,#4338CA,#6366F1);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,0.9);">'
+        + '<span class="img-label" style="position:absolute;top:8px;left:8px;padding:3px 10px;border-radius:12px;background:rgba(0,0,0,0.45);color:#fff;font-size:12px;font-weight:600;">术前 D0</span>'
+        + '<span style="opacity:0.6;">术前参考图</span>'
+      + '</div>'
+      + '<div class="img-after" style="position:absolute;inset:0;background:linear-gradient(135deg,#059669,#34D399);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,0.9);clip-path:inset(0 0 0 ' + currentSliderPos + '%);">'
+        + '<span class="img-label" style="position:absolute;top:8px;right:8px;padding:3px 10px;border-radius:12px;background:#2563EB;color:#fff;font-size:12px;font-weight:600;">术后 D' + currentDay + '</span>'
+        + '<span style="opacity:0.6;">术后参考图</span>'
+      + '</div>'
+      + '<div id="magnifierLens" class="magnifier-lens"></div>'
+      + '<div class="slider-line-bg" style="position:absolute;top:0;bottom:0;left:' + currentSliderPos + '%;width:5px;background:rgba(0,0,0,0.15);transform:translateX(-2.5px);z-index:3;pointer-events:none;"></div>'
+      + '<div class="slider-line" id="sliderLine" style="position:absolute;top:0;bottom:0;left:' + currentSliderPos + '%;width:2px;background:#fff;box-shadow:0 0 6px rgba(0,0,0,0.4);z-index:4;pointer-events:none;"></div>'
+      + '<div class="slider-handle" id="sliderHandle" style="position:absolute;top:50%;left:' + currentSliderPos + '%;width:40px;height:40px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,0.25);transform:translate(-50%,-50%);cursor:ew-resize;z-index:5;display:flex;align-items:center;justify-content:center;">'
+        + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline><polyline points="9 18 15 12 9 6"></polyline></svg>'
+      + '</div>'
+      + '</div>';
+    html+='<div class="compare-area">'+sliderHtml+'</div>';
   }else if(compareMode==='overlay'){
     var beforeOpacity=(100-currentOverlayOpacity)/100;
     var afterOpacity=currentOverlayOpacity/100;
@@ -918,15 +928,17 @@ function initSlider(){
   if(!container)return;
   var handle=document.getElementById('sliderHandle');
   var line=document.getElementById('sliderLine');
+  var lineBg=container.querySelector('.slider-line-bg');
   var afterImg=container.querySelector('.img-after');
   var dragging=false;
   function onMove(x){
     var rect=container.getBoundingClientRect();
-    var p=Math.max(0,Math.min(100,((x-rect.left)/rect.width)*100));
-    currentSliderPos=p;
-    handle.style.left=p+'%';
-    line.style.left=p+'%';
-    afterImg.style.clipPath='inset(0 '+(100-p)+'% 0 0)';
+    var percent=Math.max(0,Math.min(100,((x-rect.left)/rect.width)*100));
+    currentSliderPos=percent;
+    afterImg.style.clipPath='inset(0 0 0 '+percent+'%)';
+    line.style.left=percent+'%';
+    if(lineBg)lineBg.style.left=percent+'%';
+    handle.style.left=percent+'%';
   }
   function onStart(e){dragging=true;e.preventDefault()}
   function onEnd(){dragging=false}
@@ -966,26 +978,38 @@ function doMag(cx,cy,container){
   var x=cx-rect.left;
   var y=cy-rect.top;
   if(x<0||x>rect.width||y<0||y>rect.height){lens.style.display='none';return}
-  var lensSize=120;
   var zoom=2.5;
+  var lensSize=120;
+  var BEFORE_GRAD='linear-gradient(135deg,#4338CA,#6366F1)';
+  var AFTER_GRAD='linear-gradient(135deg,#059669,#34D399)';
+  var BLEND_GRAD='linear-gradient(135deg,#4338CA 0%,#3B82F6 50%,#34D399 100%)';
+  var bg=AFTER_GRAD;
+  var label='';
+  if(compareMode==='slider'){
+    var splitPx=currentSliderPos/100*rect.width;
+    var leftSide=(x<splitPx);
+    bg=leftSide?BEFORE_GRAD:AFTER_GRAD;
+    label=leftSide?'术前':'术后';
+  }else if(compareMode==='overlay'){
+    bg=BLEND_GRAD;
+    label='透明度 '+currentOverlayOpacity+'%';
+  }else if(compareMode==='side'){
+    if(container.classList.contains('before-side')||container.classList.contains('img-before')){
+      bg=BEFORE_GRAD;label='术前';
+    }else{
+      bg=AFTER_GRAD;label='术后';
+    }
+  }
   lens.style.display='block';
   lens.style.left=(x-lensSize/2)+'px';
   lens.style.top=(y-lensSize/2)+'px';
-  var BEFORE_GRADIENT='linear-gradient(135deg,#4338CA,#6366F1)';
-  var AFTER_GRADIENT='linear-gradient(135deg,#059669,#34D399)';
-  var bg=AFTER_GRADIENT;
-  if(container.classList.contains('before-side')||container.classList.contains('img-before')){bg=BEFORE_GRADIENT}
-  if(compareMode==='slider'&&lensId==='magnifierLens'){
-    var sliderLeft=currentSliderPos/100*rect.width;
-    if(x<sliderLeft){bg=BEFORE_GRADIENT}else{bg=AFTER_GRADIENT}
-  }
-  if(compareMode==='overlay'&&lensId==='magnifierLens'){bg='linear-gradient(135deg,#4338CA,#34D399)'}
   lens.style.background=bg;
   lens.style.backgroundSize=(rect.width*zoom)+'px '+(rect.height*zoom)+'px';
   var bgX=-(x*zoom-lensSize/2);
   var bgY=-(y*zoom-lensSize/2);
   lens.style.backgroundPosition=bgX+'px '+bgY+'px';
   lens.style.backgroundRepeat='no-repeat';
+  lens.innerHTML='<div style="position:absolute;bottom:4px;right:6px;font-size:10px;color:rgba(255,255,255,0.85);font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.4);">'+label+'</div>';
 }
 
 var magnifierOn=false;
@@ -1240,8 +1264,14 @@ function toggleCaseAutoPlay(){
 function renderTodos(){
   var todoPatients=patients.filter(function(p){return p.status==='需回访'});
   var todoSection=document.getElementById('todoSection');
+  var badge=document.getElementById('todoCountBadge');
+  if(badge)badge.textContent='0';
   if(!todoSection)return;
-  if(todoPatients.length===0){todoSection.innerHTML='<p style="padding:0 16px;color:var(--gray-400);font-size:13px;">暂无待办事项</p>';return}
+  if(todoPatients.length===0){
+    todoSection.innerHTML='<p style="padding:12px 16px;color:var(--gray-400);font-size:13px;text-align:center;background:#fff;border-radius:8px;margin:0 16px;">✅ 暂无待办 · 全部回访已处理</p>';
+    return;
+  }
+  if(badge)badge.textContent=todoPatients.length;
   var h='';
   todoPatients.forEach(function(p){
     var lastTimeline=p.timeline[p.timeline.length-1];
@@ -1272,14 +1302,14 @@ function handleTodoAction(pid,action){
   else if(action==='no-answer'){todoStatuses[pid]='no-answer'}
   else if(action==='appointed'){
     p.status='即将复诊';
-    document.getElementById('reminderPatient').value=p.name;
+    pendingReminderPatient=p.name;
     delete todoStatuses[pid];
     showAddReminder();
   }
   localStorage.setItem('mh_todo_statuses',JSON.stringify(todoStatuses));
   var statusMap={};patients.forEach(function(pp){statusMap[pp.id]=pp.status});
   localStorage.setItem('mh_patient_statuses',JSON.stringify(statusMap));
-  renderPatients();renderTodos();renderReminders();
+  renderPatients();renderReminders();renderTodos();
   if(document.getElementById('patientDetail').classList.contains('open')){openDetail(pid)}
   if(action==='called')showToast(p.name+' 已标记: 已联系完成');
   else if(action==='no-answer')showToast('已记录未接通，稍后重拨');
@@ -1289,7 +1319,13 @@ function handleTodoAction(pid,action){
 function showAddReminder(){
   var sel=document.getElementById('reminderPatient');
   sel.innerHTML=patients.map(function(p){return'<option value="'+p.name+'">'+p.name+'</option>'}).join('');
-  sel.value=currentPatient.name;
+  if(pendingReminderPatient!==null&&pendingReminderPatient!==''){
+    sel.value=pendingReminderPatient;
+  }else{
+    sel.value=currentPatient.name;
+  }
+  if(!sel.value&&sel.options.length>0){sel.value=sel.options[0].value}
+  pendingReminderPatient=null;
   document.getElementById('reminderModalOverlay').classList.add('open');
   document.getElementById('reminderModal').classList.add('open');
 }
