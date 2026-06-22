@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>医美随访助手</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--primary:#2563EB;--primary-light:#3B82F6;--primary-dark:#1D4ED8;--primary-bg:#EFF6FF;--success:#10B981;--warning:#F59E0B;--danger:#EF4444;--text:#1E293B;--text2:#64748B;--text3:#94A3B8;--bg:#F8FAFC;--card:#fff;--border:#E2E8F0;--shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);--shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.06);--radius:12px;--radius-sm:8px;--tab-h:56px;--header-h:56px}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:14px;color:var(--text);background:var(--bg);overflow:hidden}
+body{display:flex;flex-direction:column;height:100%}
+.header{height:var(--header-h);background:var(--primary);color:#fff;display:flex;align-items:center;padding:0 16px;flex-shrink:0;z-index:100;position:relative}
+.header h1{font-size:17px;font-weight:600;flex:1}
+.header-btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:none;background:rgba(255,255,255,.15);color:#fff;cursor:pointer}
+.header-btn:active{background:rgba(255,255,255,.3)}
+.page-container{flex:1;overflow:hidden;position:relative}
+.page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:16px 16px calc(var(--tab-h) + 16px);opacity:0;transform:translateX(20px);pointer-events:none;transition:opacity .25s,transform .25s;-webkit-overflow-scrolling:touch}
+.page.active{opacity:1;transform:translateX(0);pointer-events:auto}
+.tab-bar{height:var(--tab-h);background:var(--card);border-top:1px solid var(--border);display:flex;flex-shrink:0;z-index:100}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:10px;padding:4px 0;transition:color .2s}
+.tab-item.active{color:var(--primary)}
+.tab-item svg{width:22px;height:22px;fill:currentColor}
+.search-bar{display:flex;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;height:40px;margin-bottom:12px;box-shadow:var(--shadow)}
+.search-bar svg{width:18px;height:18px;fill:var(--text3);flex-shrink:0}
+.search-bar input{flex:1;border:none;outline:none;font-size:14px;padding:0 8px;background:transparent;color:var(--text)}
+.search-bar input::placeholder{color:var(--text3)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;padding:6px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;transition:all .2s;flex-shrink:0}
+.chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.stats-row{display:flex;gap:8px;margin-bottom:16px}
+.stat-card{flex:1;background:var(--card);border-radius:var(--radius-sm);padding:10px 8px;text-align:center;box-shadow:var(--shadow)}
+.stat-card .num{font-size:20px;font-weight:700;color:var(--primary)}
+.stat-card .num.warning{color:var(--warning)}
+.stat-card .num.danger{color:var(--danger)}
+.stat-card .num.success{color:var(--success)}
+.stat-card .label{font-size:10px;color:var(--text3);margin-top:2px}
+.patient-card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:var(--shadow);display:flex;align-items:center;gap:12px;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.patient-card:active{transform:scale(.98);box-shadow:none}
+.avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#fff;flex-shrink:0}
+.avatar.a1{background:linear-gradient(135deg,#6366F1,#8B5CF6)}
+.avatar.a2{background:linear-gradient(135deg,#EC4899,#F43F5E)}
+.avatar.a3{background:linear-gradient(135deg,#14B8A6,#06B6D4)}
+.avatar.a4{background:linear-gradient(135deg,#F59E0B,#EF4444)}
+.avatar.a5{background:linear-gradient(135deg,#2563EB,#7C3AED)}
+.patient-info{flex:1;min-width:0}
+.patient-name{font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px}
+.patient-project{font-size:12px;color:var(--text2);margin-top:2px}
+.patient-visit{font-size:11px;color:var(--text3);margin-top:2px}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:500}
+.badge.recovering{background:#FEF3C7;color:#D97706}
+.badge.normal{background:#D1FAE5;color:#059669}
+.badge.followup{background:#FEE2E2;color:#DC2626}
+.sub-page{position:fixed;inset:0;background:var(--bg);z-index:200;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sub-page.open{transform:translateX(0)}
+.sub-header{height:var(--header-h);background:var(--primary);color:#fff;display:flex;align-items:center;padding:0 8px;position:sticky;top:0;z-index:10}
+.sub-header .back-btn{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:none;background:none;color:#fff;cursor:pointer}
+.sub-header h2{font-size:17px;font-weight:600;flex:1}
+.detail-info{background:var(--card);margin:16px;padding:16px;border-radius:var(--radius);box-shadow:var(--shadow)}
+.detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.detail-row:last-child{border:none}
+.detail-row .label{color:var(--text2)}
+.quick-actions{display:flex;gap:10px;margin:0 16px 16px}
+.quick-action{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:var(--card);border-radius:var(--radius-sm);box-shadow:var(--shadow);cursor:pointer;border:none;font-size:11px;color:var(--text2);transition:background .15s}
+.quick-action:active{background:var(--primary-bg)}
+.quick-action svg{width:24px;height:24px;fill:var(--primary)}
+.timeline-section{margin:0 16px 16px}
+.timeline-section h3{font-size:15px;font-weight:600;margin-bottom:12px}
+.tl-item{display:flex;gap:12px;margin-bottom:0;position:relative}
+.tl-line{width:2px;background:var(--border);position:relative;flex-shrink:0;min-height:40px}
+.tl-dot{width:12px;height:12px;border-radius:50%;background:var(--primary);position:absolute;left:-5px;top:4px;border:2px solid var(--card);z-index:1}
+.tl-dot.future{background:var(--text3)}
+.tl-content{flex:1;padding-bottom:20px}
+.tl-date{font-size:12px;color:var(--primary);font-weight:600}
+.tl-label{font-size:11px;color:var(--text3);margin-top:1px}
+.tl-photos{display:flex;gap:6px;margin-top:8px}
+.tl-photo{width:60px;height:60px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--primary);overflow:hidden;flex-direction:column;gap:2px}
+.tl-photo.front{background:linear-gradient(135deg,#E0E7FF,#C7D2FE)}
+.tl-photo.deg45{background:linear-gradient(135deg,#DBEAFE,#BFDBFE)}
+.tl-photo.deg90{background:linear-gradient(135deg,#E0F2FE,#BAE6FD)}
+.tl-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tl-tag{padding:2px 8px;border-radius:10px;font-size:10px;background:var(--primary-bg);color:var(--primary)}
+.tl-note{font-size:12px;color:var(--text2);margin-top:6px;padding:6px 8px;background:#F8FAFC;border-radius:var(--radius-sm)}
+.patient-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}
+.patient-chips::-webkit-scrollbar{display:none}
+.patient-chip{white-space:nowrap;padding:6px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;transition:all .2s;flex-shrink:0}
+.patient-chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.compare-modes{display:flex;gap:8px;margin-bottom:12px}
+.compare-mode-btn{flex:1;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);font-size:12px;text-align:center;cursor:pointer;transition:all .2s}
+.compare-mode-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.day-selector{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;scrollbar-width:none}
+.day-selector::-webkit-scrollbar{display:none}
+.day-btn{white-space:nowrap;padding:6px 12px;border-radius:16px;font-size:11px;border:1px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;flex-shrink:0;transition:all .2s}
+.day-btn.active{background:var(--primary-bg);color:var(--primary);border-color:var(--primary)}
+.compare-area{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px;position:relative}
+.compare-img-container{width:100%;aspect-ratio:3/4;position:relative;overflow:hidden;background:#1a1a1a;touch-action:none;max-height:400px}
+.compare-img-container .img-before,.compare-img-container .img-after{position:absolute;inset:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.5)}
+.img-before{background:linear-gradient(135deg,#4338CA,#6366F1)}
+.img-after{background:linear-gradient(135deg,#059669,#34D399)}
+.img-label{position:absolute;top:8px;padding:2px 10px;border-radius:10px;font-size:10px;color:#fff;background:rgba(0,0,0,.5)}
+.slider-line{position:absolute;top:0;bottom:0;width:2px;background:#fff;z-index:5;pointer-events:none}
+.slider-handle{position:absolute;top:50%;width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:6;transform:translate(-50%,-50%);cursor:grab;display:flex;align-items:center;justify-content:center}
+.slider-handle svg{width:20px;height:20px;fill:var(--text)}
+.opacity-control{padding:12px;background:var(--card);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+.opacity-control input[type=range]{flex:1;accent-color:var(--primary)}
+.side-by-side{display:flex;gap:2px;border-radius:var(--radius);overflow:hidden;margin-bottom:12px}
+.side-by-side .side{flex:1;aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,.5);position:relative}
+.side-by-side .side.before-side{background:linear-gradient(135deg,#4338CA,#6366F1)}
+.side-by-side .side.after-side{background:linear-gradient(135deg,#059669,#34D399)}
+.side-label{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.5);color:#fff;padding:2px 8px;border-radius:10px;font-size:10px}
+.condition-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.cond-tag{padding:4px 10px;border-radius:14px;font-size:11px;border:1px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;transition:all .2s}
+.cond-tag.active{background:#FEE2E2;color:#DC2626;border-color:#FCA5A5}
+.quick-marks{display:flex;gap:8px;margin-bottom:12px}
+.quick-mark{flex:1;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--card);font-size:12px;text-align:center;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:4px}
+.quick-mark:active{transform:scale(.96)}
+.quick-mark.call{color:var(--warning)}
+.quick-mark.ok{color:var(--success)}
+.tips-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;font-size:11px;color:#92400E;line-height:1.5}
+.magnifier-toggle{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--text2)}
+.magnifier-toggle .toggle{width:40px;height:22px;border-radius:11px;background:var(--border);position:relative;cursor:pointer;transition:background .2s}
+.magnifier-toggle .toggle.on{background:var(--primary)}
+.magnifier-toggle .toggle::after{content:'';width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.magnifier-toggle .toggle.on::after{left:20px}
+.note-card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.note-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.note-type{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:500}
+.note-type.judgment{background:#DBEAFE;color:#2563EB}
+.note-type.observation{background:#D1FAE5;color:#059669}
+.note-type.order{background:#FEF3C7;color:#D97706}
+.note-type.private{background:#FEE2E2;color:#DC2626}
+.note-patient{font-size:12px;color:var(--text2)}
+.note-date{font-size:11px;color:var(--text3);margin-left:auto}
+.note-content{font-size:13px;line-height:1.6;color:var(--text)}
+.note-private-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--text3);margin-top:6px}
+.consultant-sync{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius-sm);padding:8px 10px;margin-top:8px;font-size:11px;color:var(--primary)}
+.consultant-sync-title{font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:4px}
+.fab{position:fixed;bottom:calc(var(--tab-h) + 20px);right:20px;width:52px;height:52px;border-radius:50%;background:var(--primary);color:#fff;border:none;box-shadow:0 4px 12px rgba(37,99,235,.4);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:50;transition:transform .2s}
+.fab:active{transform:scale(.9)}
+.fab svg{width:24px;height:24px;fill:#fff}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-radius:var(--radius) var(--radius) 0 0;padding:20px;z-index:301;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:80vh;overflow-y:auto}
+.modal.open{transform:translateY(0)}
+.modal h3{font-size:17px;font-weight:600;margin-bottom:16px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;outline:none;transition:border-color .2s;background:var(--card);color:var(--text);font-family:inherit}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--primary)}
+.form-group textarea{resize:vertical;min-height:80px}
+.form-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.form-row .label{font-size:13px;color:var(--text)}
+.btn{padding:10px 20px;border-radius:var(--radius-sm);border:none;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:active{background:var(--primary-dark)}
+.reminder-card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:var(--shadow);display:flex;gap:12px;align-items:flex-start}
+.reminder-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.reminder-icon.upcoming{background:#FEF3C7}
+.reminder-icon.overdue{background:#FEE2E2}
+.reminder-icon.done{background:#D1FAE5}
+.reminder-icon svg{width:18px;height:18px}
+.reminder-info{flex:1;min-width:0}
+.reminder-patient{font-size:14px;font-weight:600}
+.reminder-project{font-size:12px;color:var(--text2);margin-top:2px}
+.reminder-date{font-size:11px;color:var(--text3);margin-top:2px}
+.reminder-note{font-size:12px;color:var(--text2);margin-top:4px;padding:6px 8px;background:#F8FAFC;border-radius:var(--radius-sm)}
+.reminder-talking{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius-sm);padding:8px 10px;margin-top:8px;font-size:11px;color:var(--primary)}
+.privacy-card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.privacy-card h3{font-size:15px;font-weight:600;margin-bottom:12px}
+.privacy-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.privacy-item:last-child{border:none}
+.privacy-item .info{flex:1}
+.privacy-item .info .title{font-size:14px;font-weight:500}
+.privacy-item .info .desc{font-size:11px;color:var(--text3);margin-top:2px}
+.toggle{width:44px;height:24px;border-radius:12px;background:var(--border);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--primary)}
+.toggle::after{content:'';width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle.on::after{left:22px}
+.delete-request{background:#FEF2F2;border:1px solid #FECACA;border-radius:var(--radius);padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.delete-request .info{flex:1}
+.delete-request .name{font-size:13px;font-weight:500}
+.delete-request .date{font-size:11px;color:var(--text3)}
+.delete-request .actions{display:flex;gap:6px}
+.delete-request .actions button{padding:4px 10px;border-radius:12px;font-size:11px;border:none;cursor:pointer}
+.delete-request .approve{background:#FEE2E2;color:#DC2626}
+.delete-request .contact{background:var(--primary-bg);color:var(--primary)}
+.flow-steps{display:flex;align-items:center;gap:0;margin-top:16px;overflow-x:auto;padding-bottom:8px}
+.flow-step{display:flex;flex-direction:column;align-items:center;flex-shrink:0;text-align:center}
+.flow-step .circle{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;background:var(--primary)}
+.flow-step .circle.done{background:var(--success)}
+.flow-step .circle.current{background:var(--warning);animation:pulse 1.5s infinite}
+.flow-step .step-label{font-size:10px;color:var(--text2);margin-top:4px;max-width:70px}
+.flow-arrow{width:30px;height:2px;background:var(--border);flex-shrink:0;position:relative;margin:0 4px}
+.flow-arrow.done{background:var(--success)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.4)}50%{box-shadow:0 0 0 8px rgba(245,158,11,0)}}
+.capture-guide{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:400;display:none;flex-direction:column;align-items:center;justify-content:center}
+.capture-guide.open{display:flex}
+.capture-guide .close-btn{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.face-guide{width:240px;height:320px;border:2px dashed rgba(255,255,255,.4);border-radius:50%;position:relative;margin-bottom:20px}
+.face-guide .crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:40px;height:40px}
+.face-guide .crosshair::before,.face-guide .crosshair::after{content:'';position:absolute;background:rgba(255,255,255,.3)}
+.face-guide .crosshair::before{width:1px;height:100%;left:50%}
+.face-guide .crosshair::after{height:1px;width:100%;top:50%}
+.capture-tips{color:rgba(255,255,255,.6);font-size:12px;text-align:center;line-height:1.6;margin-bottom:30px;max-width:280px}
+.capture-btn{width:64px;height:64px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.3);cursor:pointer;position:relative;transition:transform .15s}
+.capture-btn:active{transform:scale(.9)}
+.capture-btn::after{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--primary)}
+.presentation-mode{position:fixed;inset:0;background:#000;z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+.presentation-mode.open{display:flex}
+.presentation-mode .close-btn{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.presentation-mode .patient-name{font-size:20px;font-weight:600;margin-bottom:16px}
+.presentation-mode .compare-view{display:flex;gap:20px;max-width:90vw}
+.presentation-mode .compare-view .side{width:280px;aspect-ratio:3/4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.4);position:relative}
+.presentation-mode .compare-view .side.before{background:linear-gradient(135deg,#4338CA,#6366F1)}
+.presentation-mode .compare-view .side.after{background:linear-gradient(135deg,#059669,#34D399)}
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);background:rgba(30,41,59,.9);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:600;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.section-title{font-size:15px;font-weight:600;margin-bottom:12px;color:var(--text)}
+.filter-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-tab{padding:6px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;transition:all .2s}
+.filter-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty-state svg{width:48px;height:48px;fill:var(--text3);margin-bottom:12px}
+.empty-state p{font-size:13px}
+.filter-row{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;scrollbar-width:none}
+.filter-row::-webkit-scrollbar{display:none}
+@media(min-width:768px){
+  .stats-row{gap:12px}
+  .stat-card{padding:14px 12px}
+  .patient-card{padding:16px}
+  .compare-area,.side-by-side{max-width:600px;margin-left:auto;margin-right:auto}
+  .side-by-side .side{min-height:300px}
+  .presentation-mode .compare-view .side{width:400px}
+  .patient-card:hover{box-shadow:var(--shadow-md)}
+}
+</style>
+</head>
+<body>
+
+<header class="header" id="appHeader">
+  <h1 id="headerTitle">我的患者</h1>
+  <button class="header-btn" onclick="openPresentationMode()" title="演示模式">
+    <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9.5 12.5l2.5 3 3.5-4.5 4.5 6H4l5.5-4.5z"/></svg>
+  </button>
+</header>
+
+<div class="page-container">
+  <div class="page active" id="pagePatients">
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="text" placeholder="搜索患者姓名" id="searchInput" oninput="filterPatients()">
+    </div>
+    <div class="chips" id="projectChips">
+      <div class="chip active" data-project="all" onclick="selectProject(this)">全部</div>
+      <div class="chip" data-project="除皱" onclick="selectProject(this)">除皱</div>
+      <div class="chip" data-project="填充" onclick="selectProject(this)">填充</div>
+      <div class="chip" data-project="激光" onclick="selectProject(this)">激光</div>
+      <div class="chip" data-project="皮肤管理" onclick="selectProject(this)">皮肤管理</div>
+      <div class="chip" data-project="手术" onclick="selectProject(this)">手术</div>
+    </div>
+    <div class="stats-row" id="statsRow"></div>
+    <div id="patientList"></div>
+  </div>
+
+  <div class="page" id="pageTimeline">
+    <div class="patient-chips" id="timelinePatientChips"></div>
+    <div class="timeline-section">
+      <h3>治疗时间线</h3>
+      <div id="timelineContent"></div>
+    </div>
+    <button class="fab" onclick="openCaptureGuide()" style="bottom:calc(var(--tab-h) + 20px)">
+      <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-7 8h14c1.1 0 2-.9 2-2v-1c0-2.66-5.33-4-8-4s-8 1.34-8 4v1c0 1.1.9 2 2 2z"/></svg>
+    </button>
+  </div>
+
+  <div class="page" id="pageCompare">
+    <div class="patient-chips" id="comparePatientChips"></div>
+    <div class="compare-modes">
+      <div class="compare-mode-btn active" data-mode="slider" onclick="setCompareMode(this)">滑动对比</div>
+      <div class="compare-mode-btn" data-mode="overlay" onclick="setCompareMode(this)">叠加对比</div>
+      <div class="compare-mode-btn" data-mode="side" onclick="setCompareMode(this)">并排对比</div>
+    </div>
+    <div class="day-selector" id="daySelector">
+      <div class="day-btn active" data-day="7" onclick="selectDay(this)">D0 vs D7</div>
+      <div class="day-btn" data-day="14" onclick="selectDay(this)">D0 vs D14</div>
+      <div class="day-btn" data-day="30" onclick="selectDay(this)">D0 vs D30</div>
+      <div class="day-btn" data-day="60" onclick="selectDay(this)">D0 vs D60</div>
+      <div class="day-btn" data-day="90" onclick="selectDay(this)">D0 vs D90</div>
+    </div>
+    <div id="compareContainer"></div>
+    <div class="magnifier-toggle">
+      <span>放大镜</span>
+      <div class="toggle" id="magnifierToggle" onclick="toggleMagnifier(this)"></div>
+    </div>
+    <div class="condition-tags" id="conditionTags">
+      <div class="cond-tag" data-cond="红肿" onclick="toggleCond(this)">红肿</div>
+      <div class="cond-tag" data-cond="淤青" onclick="toggleCond(this)">淤青</div>
+      <div class="cond-tag" data-cond="色沉" onclick="toggleCond(this)">色沉</div>
+      <div class="cond-tag" data-cond="填充吸收" onclick="toggleCond(this)">填充吸收</div>
+      <div class="cond-tag" data-cond="肿胀" onclick="toggleCond(this)">肿胀</div>
+    </div>
+    <div class="tips-box">
+      💡 拍摄提示：保持相同距离、光线和角度；使用自然光避免闪光灯；面部放松无表情；统一背景颜色
+    </div>
+    <div class="quick-marks">
+      <div class="quick-mark call" onclick="quickMark('需电话回访')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+        需电话回访
+      </div>
+      <div class="quick-mark ok" onclick="quickMark('恢复正常')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        恢复正常
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="pageNotes">
+    <div class="filter-tabs" id="noteFilterTabs">
+      <div class="filter-tab active" data-type="all" onclick="filterNotes(this)">全部</div>
+      <div class="filter-tab" data-type="治疗判断" onclick="filterNotes(this)">治疗判断</div>
+      <div class="filter-tab" data-type="观察记录" onclick="filterNotes(this)">观察记录</div>
+      <div class="filter-tab" data-type="医嘱" onclick="filterNotes(this)">医嘱</div>
+      <div class="filter-tab" data-type="私密备注" onclick="filterNotes(this)">私密备注</div>
+    </div>
+    <div id="notesList"></div>
+    <button class="fab" onclick="openAddNote()">
+      <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    </button>
+  </div>
+
+  <div class="page" id="pageReminders">
+    <div class="filter-tabs" id="reminderFilterTabs">
+      <div class="filter-tab active" data-status="all" onclick="filterReminders(this)">全部</div>
+      <div class="filter-tab" data-status="即将到诊" onclick="filterReminders(this)">即将到诊</div>
+      <div class="filter-tab" data-status="已过期" onclick="filterReminders(this)">已过期</div>
+      <div class="filter-tab" data-status="已完成" onclick="filterReminders(this)">已完成</div>
+    </div>
+    <div id="remindersList"></div>
+    <button class="fab" onclick="openAddReminder()">
+      <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+    </button>
+  </div>
+
+  <div class="page" id="pagePrivacy">
+    <div class="privacy-card">
+      <h3>隐私控制</h3>
+      <div class="privacy-item">
+        <div class="info"><div class="title">照片自动模糊</div><div class="desc">咨询师查看时自动模糊敏感部位</div></div>
+        <div class="toggle on" onclick="togglePrivacy(this)"></div>
+      </div>
+      <div class="privacy-item">
+        <div class="info"><div class="title">咨询师可见范围</div><div class="desc">仅允许查看已批准的内容</div></div>
+        <div class="toggle on" onclick="togglePrivacy(this)"></div>
+      </div>
+      <div class="privacy-item">
+        <div class="info"><div class="title">加密存储</div><div class="desc">本地数据加密存储</div></div>
+        <div class="toggle" onclick="togglePrivacy(this)"></div>
+      </div>
+      <div class="privacy-item">
+        <div class="info"><div class="title">自动过期删除</div><div class="desc">超过保留期限自动删除数据</div></div>
+        <div class="toggle" onclick="togglePrivacy(this)"></div>
+      </div>
+    </div>
+    <div class="privacy-card">
+      <h3>删除请求</h3>
+      <div class="delete-request">
+        <div class="info"><div class="name">张美琳 - 数据删除请求</div><div class="date">2026-06-20 提交</div></div>
+        <div class="actions">
+          <button class="contact" onclick="showToast('已发送联系确认')">联系</button>
+          <button class="approve" onclick="showToast('已批准删除请求')">批准</button>
+        </div>
+      </div>
+      <div class="delete-request">
+        <div class="info"><div class="name">李晓红 - 部分数据删除</div><div class="date">2026-06-18 提交</div></div>
+        <div class="actions">
+          <button class="contact" onclick="showToast('已发送联系确认')">联系</button>
+          <button class="approve" onclick="showToast('已批准删除请求')">批准</button>
+        </div>
+      </div>
+    </div>
+    <div class="privacy-card">
+      <h3>隐私处理流程</h3>
+      <div class="flow-steps">
+        <div class="flow-step"><div class="circle done">1</div><div class="step-label">收到请求</div></div>
+        <div class="flow-arrow done"></div>
+        <div class="flow-step"><div class="circle current">2</div><div class="step-label">医生确认</div></div>
+        <div class="flow-arrow"></div>
+        <div class="flow-step"><div class="circle">3</div><div class="step-label">数据隔离</div></div>
+        <div class="flow-arrow"></div>
+        <div class="flow-step"><div class="circle">4</div><div class="step-label">永久删除</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav class="tab-bar">
+  <button class="tab-item active" data-page="pagePatients" onclick="switchPage(this)">
+    <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+    <span>患者</span>
+  </button>
+  <button class="tab-item" data-page="pageTimeline" onclick="switchPage(this)">
+    <svg viewBox="0 0 24 24"><path d="M23 8c0 1.1-.9 2-2 2-.18 0-.35-.02-.51-.07l-3.56 3.55c.05.16.07.34.07.52 0 1.1-.9 2-2 2s-2-.9-2-2c0-.18.02-.36.07-.52l-2.55-2.55c-.16.05-.34.07-.52.07s-.36-.02-.52-.07l-4.55 4.56c.05.16.07.33.07.51 0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2c.18 0 .35.02.51.07l4.56-4.55C8.02 9.36 8 9.18 8 9c0-1.1.9-2 2-2s2 .9 2 2c0 .18-.02.36-.07.52l2.55 2.55c.16-.05.34-.07.52-.07s.36.02.52.07l3.55-3.56C19.02 8.35 19 8.18 19 8c0-1.1.9-2 2-2s2 .9 2 2z"/></svg>
+    <span>时间线</span>
+  </button>
+  <button class="tab-item" data-page="pageCompare" onclick="switchPage(this)">
+    <svg viewBox="0 0 24 24"><path d="M7 5h10v2h1V3H6v4h1zm5.5 9a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM6 19h12v-2h1v4H5v-4h1zm3-7l4 4 4-4h-3V8h-2v4z"/></svg>
+    <span>对比</span>
+  </button>
+  <button class="tab-item" data-page="pageNotes" onclick="switchPage(this)">
+    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></svg>
+    <span>备注</span>
+  </button>
+  <button class="tab-item" data-page="pageReminders" onclick="switchPage(this)">
+    <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+    <span>提醒</span>
+  </button>
+  <button class="tab-item" data-page="pagePrivacy" onclick="switchPage(this)">
+    <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+    <span>隐私</span>
+  </button>
+</nav>
+
+<div class="sub-page" id="patientDetail">
+  <div class="sub-header">
+    <button class="back-btn" onclick="closeDetail()">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="#fff"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <h2 id="detailName">患者详情</h2>
+  </div>
+  <div class="detail-info" id="detailInfo"></div>
+  <div class="quick-actions">
+    <button class="quick-action" onclick="goToTimeline();closeDetail()">
+      <svg viewBox="0 0 24 24"><path d="M23 8c0 1.1-.9 2-2 2-.18 0-.35-.02-.51-.07l-3.56 3.55c.05.16.07.34.07.52 0 1.1-.9 2-2 2s-2-.9-2-2c0-.18.02-.36.07-.52l-2.55-2.55c-.16.05-.34.07-.52.07s-.36-.02-.52-.07l-4.55 4.56c.05.16.07.33.07.51 0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2c.18 0 .35.02.51.07l4.56-4.55C8.02 9.36 8 9.18 8 9c0-1.1.9-2 2-2s2 .9 2 2c0 .18-.02.36-.07.52l2.55 2.55c.16-.05.34-.07.52-.07s.36.02.52.07l3.55-3.56C19.02 8.35 19 8.18 19 8c0-1.1.9-2 2-2s2 .9 2 2z"/></svg>
+      时间线
+    </button>
+    <button class="quick-action" onclick="goToCompare();closeDetail()">
+      <svg viewBox="0 0 24 24"><path d="M7 5h10v2h1V3H6v4h1zm5.5 9a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM6 19h12v-2h1v4H5v-4h1zm3-7l4 4 4-4h-3V8h-2v4z"/></svg>
+      对比
+    </button>
+    <button class="quick-action" onclick="openAddNote()">
+      <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      添加备注
+    </button>
+    <button class="quick-action" onclick="openCaptureGuide()">
+      <svg viewBox="0 0 24 24"><path d="M9 13h-2v-2h2v2zm4-2h-2v2h2v-2zm4 0h-2v2h2v-2zm4-5H3v16h18V6zm-2 14H5V9h14v11z"/></svg>
+      拍摄
+    </button>
+  </div>
+  <div class="timeline-section" style="margin:0 16px 16px">
+    <h3>近期时间线</h3>
+    <div id="detailTimeline"></div>
+  </div>
+</div>
+
+<div class="capture-guide" id="captureGuide">
+  <button class="close-btn" onclick="closeCaptureGuide()">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="#fff"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+  </button>
+  <div class="face-guide"><div class="crosshair"></div></div>
+  <div class="capture-tips">
+    📐 保持50cm距离 · 💡 使用自然光 · 😊 面部放松无表情 · 🔄 统一角度拍摄
+  </div>
+  <button class="capture-btn" onclick="capturePhoto()"></button>
+</div>
+
+<div class="presentation-mode" id="presentationMode">
+  <button class="close-btn" onclick="closePresentationMode()">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="#fff"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+  </button>
+  <div class="patient-name" id="presPatientName">王雅婷</div>
+  <div class="compare-view">
+    <div class="side before"><span>术前</span><span class="side-label">术前 D0</span></div>
+    <div class="side after"><span>术后</span><span class="side-label">术后 D30</span></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="noteModalOverlay" onclick="closeAddNote()"></div>
+<div class="modal" id="noteModal">
+  <h3>添加备注</h3>
+  <div class="form-group">
+    <label>类型</label>
+    <select id="noteType">
+      <option value="治疗判断">治疗判断</option>
+      <option value="观察记录">观察记录</option>
+      <option value="医嘱">医嘱</option>
+      <option value="私密备注">私密备注</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>患者</label>
+    <select id="notePatient"></select>
+  </div>
+  <div class="form-group">
+    <label>内容</label>
+    <textarea id="noteContent" placeholder="输入备注内容..."></textarea>
+  </div>
+  <div class="form-row">
+    <span class="label">仅医生可见</span>
+    <div class="toggle" id="notePrivateToggle" onclick="togglePrivacy(this)"></div>
+  </div>
+  <div class="form-row">
+    <span class="label">同步咨询师</span>
+    <div class="toggle" id="noteSyncToggle" onclick="togglePrivacy(this);toggleSyncField()"></div>
+  </div>
+  <div class="form-group" id="syncField" style="display:none">
+    <label>同步内容（咨询师可见）</label>
+    <input type="text" id="noteSyncContent" placeholder="输入咨询师可见的要点...">
+  </div>
+  <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveNote()">保存备注</button>
+</div>
+
+<div class="modal-overlay" id="reminderModalOverlay" onclick="closeAddReminder()"></div>
+<div class="modal" id="reminderModal">
+  <h3>添加复诊提醒</h3>
+  <div class="form-group">
+    <label>患者</label>
+    <select id="reminderPatient"></select>
+  </div>
+  <div class="form-group">
+    <label>日期</label>
+    <input type="date" id="reminderDate">
+  </div>
+  <div class="form-group">
+    <label>项目</label>
+    <select id="reminderProject">
+      <option value="除皱">除皱</option>
+      <option value="填充">填充</option>
+      <option value="激光">激光</option>
+      <option value="皮肤管理">皮肤管理</option>
+      <option value="手术">手术</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>备注</label>
+    <textarea id="reminderNote" placeholder="输入备注..."></textarea>
+  </div>
+  <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveReminder()">保存提醒</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var patients=[
+  {id:1,name:'王雅婷',project:'除皱',status:'恢复中',lastVisit:'2026-06-15',phone:'138****6201',age:34,avatar:'a1',timeline:[
+    {day:0,date:'2026-06-15',label:'术前',tags:['面部评估'],note:'额纹及鱼尾纹明显，建议肉毒素注射'},
+    {day:7,date:'2026-06-22',label:'术后7天',tags:['轻微红肿','无淤青'],note:'注射部位轻微红肿，属正常反应'},
+    {day:14,date:'2026-06-29',label:'术后14天',tags:['恢复良好'],note:'皱纹明显改善，效果满意'},
+    {day:30,date:'2026-07-15',label:'术后30天',tags:['效果稳定'],note:''}
+  ]},
+  {id:2,name:'李思涵',project:'填充',status:'正常',lastVisit:'2026-06-10',phone:'139****3388',age:28,avatar:'a2',timeline:[
+    {day:0,date:'2026-06-10',label:'术前',tags:['面部评估'],note:'鼻唇沟较深，建议玻尿酸填充'},
+    {day:7,date:'2026-06-17',label:'术后7天',tags:['轻微肿胀'],note:'填充区域轻微肿胀，形态自然'},
+    {day:30,date:'2026-07-10',label:'术后30天',tags:['效果良好'],note:'填充效果自然，患者满意'}
+  ]},
+  {id:3,name:'张美琳',project:'激光',status:'需回访',lastVisit:'2026-05-28',phone:'136****7721',age:31,avatar:'a3',timeline:[
+    {day:0,date:'2026-05-28',label:'术前',tags:['皮肤评估'],note:'面部色斑明显，建议皮秒激光治疗'},
+    {day:7,date:'2026-06-04',label:'术后7天',tags:['结痂脱落','注意防晒'],note:'结痂基本脱落，需加强防晒'},
+    {day:14,date:'2026-06-11',label:'术后14天',tags:['色沉风险'],note:'出现轻微色沉，需密切观察'}
+  ]},
+  {id:4,name:'陈诗雨',project:'皮肤管理',status:'正常',lastVisit:'2026-06-18',phone:'137****5590',age:26,avatar:'a4',timeline:[
+    {day:0,date:'2026-06-18',label:'首次',tags:['皮肤检测'],note:'皮肤屏障受损，建议修复管理方案'},
+    {day:7,date:'2026-06-25',label:'7天',tags:['改善中'],note:''}
+  ]},
+  {id:5,name:'刘雨萱',project:'手术',status:'恢复中',lastVisit:'2026-06-12',phone:'135****8832',age:37,avatar:'a5',timeline:[
+    {day:0,date:'2026-06-12',label:'术前',tags:['术前评估'],note:'双眼皮手术，切开法'},
+    {day:7,date:'2026-06-19',label:'术后7天',tags:['肿胀明显','淤青'],note:'拆线完成，肿胀淤青属正常范围'},
+    {day:14,date:'2026-06-26',label:'术后14天',tags:['消肿中'],note:'肿胀逐渐消退'},
+    {day:30,date:'2026-07-12',label:'术后30天',tags:['恢复期'],note:''},
+    {day:90,date:'2026-09-10',label:'术后90天',tags:['最终评估'],note:''}
+  ]},
+  {id:6,name:'赵婉如',project:'除皱',status:'正常',lastVisit:'2026-06-05',phone:'158****4412',age:42,avatar:'a1',timeline:[
+    {day:0,date:'2026-06-05',label:'术前',tags:['面部评估'],note:'抬头纹及眉间纹'},
+    {day:7,date:'2026-06-12',label:'术后7天',tags:['恢复良好'],note:'效果自然'},
+    {day:30,date:'2026-07-05',label:'术后30天',tags:['效果稳定'],note:'满意'}
+  ]},
+  {id:7,name:'孙佳怡',project:'填充',status:'需回访',lastVisit:'2026-05-20',phone:'159****6678',age:33,avatar:'a3',timeline:[
+    {day:0,date:'2026-05-20',label:'术前',tags:['面部评估'],note:'苹果肌填充'},
+    {day:7,date:'2026-05-27',label:'术后7天',tags:['轻微肿胀'],note:''},
+    {day:30,date:'2026-06-19',label:'术后30天',tags:['需复查'],note:'需确认填充吸收情况'}
+  ]},
+  {id:8,name:'周诗韵',project:'激光',status:'恢复中',lastVisit:'2026-06-16',phone:'186****9901',age:29,avatar:'a2',timeline:[
+    {day:0,date:'2026-06-16',label:'术前',tags:['皮肤评估'],note:'痘印激光治疗'},
+    {day:7,date:'2026-06-23',label:'术后7天',tags:['红肿','结痂'],note:'治疗区域红肿结痂，属正常'}
+  ]},
+  {id:9,name:'吴雅琴',project:'皮肤管理',status:'正常',lastVisit:'2026-06-20',phone:'188****2256',age:24,avatar:'a4',timeline:[
+    {day:0,date:'2026-06-20',label:'首次',tags:['皮肤检测'],note:'补水管理方案'},
+    {day:7,date:'2026-06-27',label:'7天',tags:['效果良好'],note:''}
+  ]},
+  {id:10,name:'郑梦瑶',project:'手术',status:'需回访',lastVisit:'2026-05-15',phone:'130****3367',age:40,avatar:'a5',timeline:[
+    {day:0,date:'2026-05-15',label:'术前',tags:['术前评估'],note:'隆鼻手术'},
+    {day:7,date:'2026-05-22',label:'术后7天',tags:['拆线','肿胀'],note:'拆线完成'},
+    {day:30,date:'2026-06-14',label:'术后30天',tags:['恢复中'],note:'需回访确认恢复情况'}
+  ]}
+];
+
+var notes=[
+  {id:1,type:'治疗判断',patient:'王雅婷',date:'2026-06-22',content:'注射后7天复查，额纹改善明显，鱼尾纹效果待观察。建议2周后再次评估。',isPrivate:false,sync:'额纹改善良好，鱼尾纹待观察'},
+  {id:2,type:'观察记录',patient:'周诗韵',date:'2026-06-21',content:'激光术后第5天，红肿基本消退，结痂开始脱落。注意防晒和保湿。',isPrivate:false,sync:null},
+  {id:3,type:'医嘱',patient:'刘雨萱',date:'2026-06-19',content:'术后7天拆线，继续冷敷消肿，避免剧烈运动，2周后复查。',isPrivate:false,sync:'拆线完成，需冷敷消肿'},
+  {id:4,type:'私密备注',patient:'孙佳怡',date:'2026-06-18',content:'患者对填充效果不满意，考虑补打。需沟通期望值管理。',isPrivate:true,sync:null},
+  {id:5,type:'治疗判断',patient:'张美琳',date:'2026-06-17',content:'激光术后出现轻微色沉，建议继续观察，必要时追加治疗。',isPrivate:false,sync:'术后色沉观察中，暂无需处理'}
+];
+
+var reminders=[
+  {id:1,patient:'王雅婷',project:'除皱',date:'2026-06-29',status:'即将到诊',note:'术后14天复查，评估鱼尾纹效果',talking:'询问恢复感受，确认下次治疗时间'},
+  {id:2,patient:'刘雨萱',project:'手术',date:'2026-06-26',status:'即将到诊',note:'术后14天复查，评估消肿情况',talking:'确认消肿进度，提醒避免剧烈运动'},
+  {id:3,patient:'张美琳',project:'激光',date:'2026-06-20',status:'已过期',note:'术后3周复查，色沉观察',talking:'需电话跟进色沉情况'},
+  {id:4,patient:'孙佳怡',project:'填充',date:'2026-06-19',status:'已过期',note:'术后30天复查，填充吸收评估',talking:'需沟通补打意向'},
+  {id:5,patient:'郑梦瑶',project:'手术',date:'2026-05-15',status:'已过期',note:'术后30天复查，隆鼻恢复评估',talking:'确认恢复状态，安排复查'},
+  {id:6,patient:'陈诗雨',project:'皮肤管理',date:'2026-06-25',status:'即将到诊',note:'7天复查，皮肤修复评估',talking:'询问使用产品感受'},
+  {id:7,patient:'赵婉如',project:'除皱',date:'2026-07-05',status:'即将到诊',note:'术后30天复查',talking:'确认效果满意度'},
+  {id:8,patient:'周诗韵',project:'激光',date:'2026-06-18',status:'已完成',note:'术后7天复查',talking:null}
+];
+
+var currentProject='all';
+var currentPatient=patients[0];
+var compareMode='slider';
+var currentDay=7;
+var noteFilter='all';
+var reminderFilter='all';
+var sliderPos=50;
+
+var pageTitles={pagePatients:'我的患者',pageTimeline:'疗程时间线',pageCompare:'拍摄对比',pageNotes:'医嘱备注',pageReminders:'复诊提醒',pagePrivacy:'隐私设置'};
+
+function switchPage(el){
+  var page=el.dataset?el.dataset.page:el.getAttribute('data-page');
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('.tab-item').forEach(function(t){t.classList.remove('active')});
+  document.getElementById(page).classList.add('active');
+  var tab=document.querySelector('.tab-item[data-page="'+page+'"]');
+  if(tab)tab.classList.add('active');
+  document.getElementById('headerTitle').textContent=pageTitles[page]||'';
+  if(page==='pageTimeline')renderTimeline();
+  if(page==='pageCompare')renderCompare();
+  if(page==='pageNotes')renderNotes();
+  if(page==='pageReminders')renderReminders();
+}
+
+function getStatusClass(s){
+  if(s==='恢复中')return'recovering';
+  if(s==='需回访')return'followup';
+  return'normal';
+}
+
+function renderPatients(){
+  var search=document.getElementById('searchInput').value.toLowerCase();
+  var filtered=patients.filter(function(p){
+    var mp=currentProject==='all'||p.project===currentProject;
+    var ms=!search||p.name.toLowerCase().indexOf(search)>=0;
+    return mp&&ms;
+  });
+  var total=patients.length;
+  var rec=patients.filter(function(p){return p.status==='恢复中'}).length;
+  var fol=patients.filter(function(p){return p.status==='需回访'}).length;
+  var nor=patients.filter(function(p){return p.status==='正常'}).length;
+  document.getElementById('statsRow').innerHTML=
+    '<div class="stat-card"><div class="num">'+total+'</div><div class="label">总计</div></div>'+
+    '<div class="stat-card"><div class="num warning">'+rec+'</div><div class="label">恢复中</div></div>'+
+    '<div class="stat-card"><div class="num danger">'+fol+'</div><div class="label">需回访</div></div>'+
+    '<div class="stat-card"><div class="num success">'+nor+'</div><div class="label">正常</div></div>';
+  var html='';
+  filtered.forEach(function(p){
+    html+='<div class="patient-card" onclick="openDetail('+p.id+')">'+
+      '<div class="avatar '+p.avatar+'">'+p.name.charAt(0)+'</div>'+
+      '<div class="patient-info">'+
+        '<div class="patient-name">'+p.name+' <span class="badge '+getStatusClass(p.status)+'">'+p.status+'</span></div>'+
+        '<div class="patient-project">'+p.project+'</div>'+
+        '<div class="patient-visit">上次就诊: '+p.lastVisit+'</div>'+
+      '</div></div>';
+  });
+  if(!filtered.length)html='<div class="empty-state"><p>未找到匹配的患者</p></div>';
+  document.getElementById('patientList').innerHTML=html;
+}
+
+function selectProject(el){
+  document.querySelectorAll('#projectChips .chip').forEach(function(c){c.classList.remove('active')});
+  el.classList.add('active');
+  currentProject=el.dataset.project;
+  filterPatients();
+}
+
+function filterPatients(){renderPatients()}
+
+function openDetail(id){
+  var p=patients.find(function(x){return x.id===id});
+  if(!p)return;
+  currentPatient=p;
+  document.getElementById('detailName').textContent=p.name;
+  document.getElementById('detailInfo').innerHTML=
+    '<div class="detail-row"><span class="label">姓名</span><span>'+p.name+'</span></div>'+
+    '<div class="detail-row"><span class="label">项目</span><span>'+p.project+'</span></div>'+
+    '<div class="detail-row"><span class="label">状态</span><span class="badge '+getStatusClass(p.status)+'">'+p.status+'</span></div>'+
+    '<div class="detail-row"><span class="label">年龄</span><span>'+p.age+'岁</span></div>'+
+    '<div class="detail-row"><span class="label">电话</span><span>'+p.phone+'</span></div>'+
+    '<div class="detail-row"><span class="label">上次就诊</span><span>'+p.lastVisit+'</span></div>';
+  renderDetailTimeline(p);
+  document.getElementById('patientDetail').classList.add('open');
+}
+
+function renderDetailTimeline(p){
+  var html='';
+  p.timeline.forEach(function(t,i){
+    var isLast=i===p.timeline.length-1;
+    html+='<div class="tl-item">'+
+      '<div class="tl-line" style="'+(isLast?'background:transparent':'')+'"><div class="tl-dot'+(t.note?'':' future')+'"></div></div>'+
+      '<div class="tl-content">'+
+        '<div class="tl-date">'+t.date+'</div>'+
+        '<div class="tl-label">Day '+t.day+' · '+t.label+'</div>'+
+        '<div class="tl-photos">'+
+          '<div class="tl-photo front">正<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/></svg></div>'+
+          '<div class="tl-photo deg45">45°<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/></svg></div>'+
+          '<div class="tl-photo deg90">90°<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/></svg></div>'+
+        '</div>'+
+        '<div class="tl-tags">'+t.tags.map(function(tg){return'<span class="tl-tag">'+tg+'</span>'}).join('')+'</div>'+
+        (t.note?'<div class="tl-note">'+t.note+'</div>':'')+
+      '</div></div>';
+  });
+  document.getElementById('detailTimeline').innerHTML=html;
+}
+
+function closeDetail(){document.getElementById('patientDetail').classList.remove('open')}
+
+function goToTimeline(){
+  var tab=document.querySelector('.tab-item[data-page="pageTimeline"]');
+  switchPage(tab);
+}
+function goToCompare(){
+  var tab=document.querySelector('.tab-item[data-page="pageCompare"]');
+  switchPage(tab);
+}
+
+function renderTimeline(){
+  buildPatientChipsSimple('timelinePatientChips','timeline');
+  var p=currentPatient;
+  var html='';
+  p.timeline.forEach(function(t,i){
+    var isLast=i===p.timeline.length-1;
+    html+='<div class="tl-item">'+
+      '<div class="tl-line" style="'+(isLast?'background:transparent':'')+'"><div class="tl-dot'+(t.note?'':' future')+'"></div></div>'+
+      '<div class="tl-content">'+
+        '<div class="tl-date">'+t.date+'</div>'+
+        '<div class="tl-label">Day '+t.day+' · '+t.label+'</div>'+
+        '<div class="tl-photos">'+
+          '<div class="tl-photo front">正<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"/></svg></div>'+
+          '<div class="tl-photo deg45">45°</div>'+
+          '<div class="tl-photo deg90">90°</div>'+
+        '</div>'+
+        '<div class="tl-tags">'+t.tags.map(function(tg){return'<span class="tl-tag">'+tg+'</span>'}).join('')+'</div>'+
+        (t.note?'<div class="tl-note">'+t.note+'</div>':'')+
+      '</div></div>';
+  });
+  document.getElementById('timelineContent').innerHTML=html;
+}
+
+function buildPatientChipsSimple(containerId,ctx){
+  var html='';
+  patients.forEach(function(p){
+    html+='<div class="patient-chip'+(p.id===currentPatient.id?' active':'')+'" onclick="selectPChip(this,'+p.id+',\''+containerId+'\',\''+ctx+'\')">'+p.name+'</div>';
+  });
+  document.getElementById(containerId).innerHTML=html;
+}
+
+function selectPChip(el,id,cid,ctx){
+  currentPatient=patients.find(function(p){return p.id===id});
+  document.querySelectorAll('#'+cid+' .patient-chip').forEach(function(c){c.classList.remove('active')});
+  el.classList.add('active');
+  if(ctx==='timeline')renderTimeline();
+  if(ctx==='compare')renderCompare();
+}
+
+function setCompareMode(el){
+  document.querySelectorAll('.compare-mode-btn').forEach(function(b){b.classList.remove('active')});
+  el.classList.add('active');
+  compareMode=el.dataset.mode;
+  renderCompare();
+}
+
+function selectDay(el){
+  document.querySelectorAll('.day-btn').forEach(function(b){b.classList.remove('active')});
+  el.classList.add('active');
+  currentDay=parseInt(el.dataset.day);
+  renderCompare();
+}
+
+function renderCompare(){
+  buildPatientChipsSimple('comparePatientChips','compare');
+  var html='';
+  if(compareMode==='slider'){
+    html+='<div class="compare-area"><div class="compare-img-container" id="sliderContainer">'+
+      '<div class="img-after" style="clip:rect(0,'+sliderPos+'%,100%,0)"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
+      '<div class="img-before"><span class="img-label" style="left:8px">术前 D0</span></div>'+
+      '<div class="slider-line" id="sliderLine" style="left:'+sliderPos+'%"></div>'+
+      '<div class="slider-handle" id="sliderHandle" style="left:'+sliderPos+'%">'+
+        '<svg viewBox="0 0 24 24"><path d="M8 5l-5 7 5 7zm8 0l5 7-5 7z"/></svg>'+
+      '</div>'+
+    '</div></div>';
+  }else if(compareMode==='overlay'){
+    html+='<div class="compare-area"><div class="compare-img-container">'+
+      '<div class="img-before" style="opacity:0.5"><span class="img-label" style="left:8px">术前 D0</span></div>'+
+      '<div class="img-after" style="opacity:0.5"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
+    '</div>'+
+    '<div class="opacity-control"><span>术前</span><input type="range" min="0" max="100" value="50" id="opacitySlider" oninput="updateOverlay(this)"><span>术后</span></div></div>';
+  }else{
+    html+='<div class="side-by-side">'+
+      '<div class="side before-side"><span class="side-label">术前 D0</span>术前</div>'+
+      '<div class="side after-side"><span class="side-label">术后 D'+currentDay+'</span>术后</div>'+
+    '</div>';
+  }
+  document.getElementById('compareContainer').innerHTML=html;
+  if(compareMode==='slider')initSlider();
+}
+
+function updateOverlay(el){
+  var v=el.value;
+  var container=el.closest('.compare-area');
+  var before=container.querySelector('.img-before');
+  var after=container.querySelector('.img-after');
+  before.style.opacity=(100-v)/100;
+  after.style.opacity=v/100;
+}
+
+function initSlider(){
+  var container=document.getElementById('sliderContainer');
+  if(!container)return;
+  var handle=document.getElementById('sliderHandle');
+  var line=document.getElementById('sliderLine');
+  var afterImg=container.querySelector('.img-after');
+  var dragging=false;
+  function onMove(x){
+    var rect=container.getBoundingClientRect();
+    var p=Math.max(0,Math.min(100,((x-rect.left)/rect.width)*100));
+    sliderPos=p;
+    handle.style.left=p+'%';
+    line.style.left=p+'%';
+    afterImg.style.clipPath='inset(0 '+(100-p)+'% 0 0)';
+  }
+  function onStart(e){dragging=true;e.preventDefault()}
+  function onEnd(){dragging=false}
+  function onMM(e){if(dragging)onMove(e.clientX||e.touches[0].clientX)}
+  function onTM(e){if(dragging)onMove(e.touches[0].clientX)}
+  container.addEventListener('mousedown',function(e){dragging=true;onMove(e.clientX)});
+  container.addEventListener('touchstart',function(e){dragging=true;onMove(e.touches[0].clientX)},{passive:true});
+  document.addEventListener('mousemove',onMM);
+  document.addEventListener('touchmove',onTM,{passive:true});
+  document.addEventListener('mouseup',onEnd);
+  document.addEventListener('touchend',onEnd);
+}
+
+function toggleMagnifier(el){el.classList.toggle('on');showToast(el.classList.contains('on')?'放大镜已开启':'放大镜已关闭')}
+function toggleCond(el){el.classList.toggle('active');showToast(el.classList.contains('active')?'已标记: '+el.dataset.cond:'已取消: '+el.dataset.cond)}
+function quickMark(msg){showToast('已标记: '+msg)}
+
+function renderNotes(){
+  var filtered=notes.filter(function(n){
+    return noteFilter==='all'||n.type===noteFilter;
+  });
+  var typeClassMap={'治疗判断':'judgment','观察记录':'observation','医嘱':'order','私密备注':'private'};
+  var html='';
+  filtered.forEach(function(n){
+    html+='<div class="note-card">'+
+      '<div class="note-header">'+
+        '<span class="note-type '+typeClassMap[n.type]+'">'+n.type+'</span>'+
+        '<span class="note-patient">'+n.patient+'</span>'+
+        '<span class="note-date">'+n.date+'</span>'+
+      '</div>'+
+      '<div class="note-content">'+n.content+'</div>';
+    if(n.isPrivate){
+      html+='<div class="note-private-badge"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg> 仅医生可见</div>';
+    }
+    if(n.sync){
+      html+='<div class="consultant-sync"><div class="consultant-sync-title"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg> 咨询师同步</div>'+n.sync+'</div>';
+    }
+    html+='</div>';
+  });
+  if(!filtered.length)html='<div class="empty-state"><p>暂无备注</p></div>';
+  document.getElementById('notesList').innerHTML=html;
+}
+
+function filterNotes(el){
+  document.querySelectorAll('#noteFilterTabs .filter-tab').forEach(function(t){t.classList.remove('active')});
+  el.classList.add('active');
+  noteFilter=el.dataset.type;
+  renderNotes();
+}
+
+function renderReminders(){
+  var filtered=reminders.filter(function(r){
+    return reminderFilter==='all'||r.status===reminderFilter;
+  });
+  var statusMap={'即将到诊':'upcoming','已过期':'overdue','已完成':'done'};
+  var iconSvgs={
+    upcoming:'<svg viewBox="0 0 24 24" fill="#D97706"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>',
+    overdue:'<svg viewBox="0 0 24 24" fill="#DC2626"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+    done:'<svg viewBox="0 0 24 24" fill="#059669"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>'
+  };
+  var html='';
+  filtered.forEach(function(r){
+    html+='<div class="reminder-card">'+
+      '<div class="reminder-icon '+statusMap[r.status]+'">'+iconSvgs[statusMap[r.status]]+'</div>'+
+      '<div class="reminder-info">'+
+        '<div class="reminder-patient">'+r.patient+'</div>'+
+        '<div class="reminder-project">'+r.project+'</div>'+
+        '<div class="reminder-date">'+r.date+'</div>'+
+        '<div class="reminder-note">'+r.note+'</div>';
+    if(r.talking){
+      html+='<div class="reminder-talking"><strong>咨询师要点：</strong>'+r.talking+'</div>';
+    }
+    html+='</div></div>';
+  });
+  if(!filtered.length)html='<div class="empty-state"><p>暂无提醒</p></div>';
+  document.getElementById('remindersList').innerHTML=html;
+}
+
+function filterReminders(el){
+  document.querySelectorAll('#reminderFilterTabs .filter-tab').forEach(function(t){t.classList.remove('active')});
+  el.classList.add('active');
+  reminderFilter=el.dataset.status;
+  renderReminders();
+}
+
+function openAddNote(){
+  var sel=document.getElementById('notePatient');
+  sel.innerHTML=patients.map(function(p){return'<option value="'+p.name+'">'+p.name+'</option>'}).join('');
+  sel.value=currentPatient.name;
+  document.getElementById('noteModalOverlay').classList.add('open');
+  document.getElementById('noteModal').classList.add('open');
+}
+function closeAddNote(){
+  document.getElementById('noteModalOverlay').classList.remove('open');
+  document.getElementById('noteModal').classList.remove('open');
+}
+function toggleSyncField(){
+  var on=document.getElementById('noteSyncToggle').classList.contains('on');
+  document.getElementById('syncField').style.display=on?'block':'none';
+}
+function saveNote(){
+  var type=document.getElementById('noteType').value;
+  var patient=document.getElementById('notePatient').value;
+  var content=document.getElementById('noteContent').value;
+  if(!content){showToast('请输入备注内容');return}
+  var isPriv=document.getElementById('notePrivateToggle').classList.contains('on');
+  var hasSync=document.getElementById('noteSyncToggle').classList.contains('on');
+  var syncContent=hasSync?document.getElementById('noteSyncContent').value:null;
+  notes.unshift({id:notes.length+1,type:type,patient:patient,date:new Date().toISOString().slice(0,10),content:content,isPrivate:isPriv,sync:syncContent});
+  closeAddNote();
+  renderNotes();
+  showToast('备注已保存');
+  document.getElementById('noteContent').value='';
+  document.getElementById('noteSyncContent').value='';
+}
+
+function openAddReminder(){
+  var sel=document.getElementById('reminderPatient');
+  sel.innerHTML=patients.map(function(p){return'<option value="'+p.name+'">'+p.name+'</option>'}).join('');
+  sel.value=currentPatient.name;
+  document.getElementById('reminderModalOverlay').classList.add('open');
+  document.getElementById('reminderModal').classList.add('open');
+}
+function closeAddReminder(){
+  document.getElementById('reminderModalOverlay').classList.remove('open');
+  document.getElementById('reminderModal').classList.remove('open');
+}
+function saveReminder(){
+  var patient=document.getElementById('reminderPatient').value;
+  var date=document.getElementById('reminderDate').value;
+  var project=document.getElementById('reminderProject').value;
+  var note=document.getElementById('reminderNote').value;
+  if(!date){showToast('请选择日期');return}
+  reminders.unshift({id:reminders.length+1,patient:patient,project:project,date:date,status:'即将到诊',note:note||'待确认',talking:null});
+  closeAddReminder();
+  renderReminders();
+  showToast('提醒已保存');
+}
+
+function openCaptureGuide(){document.getElementById('captureGuide').classList.add('open')}
+function closeCaptureGuide(){document.getElementById('captureGuide').classList.remove('open')}
+function capturePhoto(){showToast('照片已拍摄');closeCaptureGuide()}
+
+function openPresentationMode(){
+  document.getElementById('presPatientName').textContent=currentPatient.name;
+  document.getElementById('presentationMode').classList.add('open');
+}
+function closePresentationMode(){document.getElementById('presentationMode').classList.remove('open')}
+
+function togglePrivacy(el){el.classList.toggle('on')}
+
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show')},2000);
+}
+
+renderPatients();
+renderNotes();
+renderReminders();
+</script>
+</body>
+</html>
