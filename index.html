@@ -281,6 +281,30 @@ body{display:flex;flex-direction:column;height:100%}
 .todo-section-title{font-size:14px;font-weight:600;color:#991B1B;padding:0 16px 4px;display:flex;align-items:center;gap:6px}
 .todo-section-title .badge{position:static;transform:none;margin-left:4px}
 .compare-active-state{display:none}
+.align-point{position:absolute;width:24px;height:24px;border-radius:50%;border:3px solid;cursor:grab;z-index:15;transform:translate(-50%,-50%);pointer-events:auto;display:none}
+.align-point::before,.align-point::after{content:'';position:absolute;background:currentColor}
+.align-point::before{left:50%;top:-8px;bottom:-8px;width:1px;transform:translateX(-50%)}
+.align-point::after{top:50%;left:-8px;right:-8px;height:1px;transform:translateY(-50%)}
+.align-point.before{border-color:#EF4444;color:#EF4444}
+.align-point.after{border-color:#3B82F6;color:#3B82F6}
+.align-point.dragging{cursor:grabbing;z-index:16}
+.align-hint{position:absolute;top:8px;left:50%;transform:translateX(-50%);padding:4px 10px;border-radius:12px;background:rgba(0,0,0,0.7);color:#fff;font-size:11px;z-index:14}
+.align-crosshair-indicator{position:absolute;width:40px;height:40px;pointer-events:none;z-index:5;opacity:0.4}
+.align-crosshair-indicator::before,.align-crosshair-indicator::after{content:'';position:absolute;background:#fff}
+.align-crosshair-indicator::before{left:50%;top:-10px;bottom:-10px;width:1px;transform:translateX(-50%)}
+.align-crosshair-indicator::after{top:50%;left:-10px;right:-10px;height:1px;transform:translateY(-50%)}
+.detail-status-card{background:#fff;border-radius:12px;padding:14px;margin:12px 16px;box-shadow:var(--shadow)}
+.detail-status-badge{display:inline-block;padding:4px 12px;border-radius:14px;font-size:12px;font-weight:600;margin-bottom:8px}
+.detail-meta-row{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px}
+.detail-meta-label{color:var(--text3);flex-shrink:0;width:64px}
+.detail-meta-value{color:var(--text);flex:1}
+.followup-history-item{background:#fff;border-radius:10px;padding:12px 14px;margin:6px 16px;box-shadow:var(--shadow-sm)}
+.followup-history-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.followup-history-action{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.followup-history-time{font-size:12px;color:var(--text3)}
+.followup-history-note{font-size:13px;color:var(--text2);margin-top:4px}
+.magnify-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--text2);cursor:pointer;font-size:12px;font-family:inherit;transition:all .2s}
+.magnify-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 </style>
 </head>
 <body>
@@ -339,6 +363,12 @@ body{display:flex;flex-direction:column;height:100%}
     <div class="magnifier-toggle">
       <span>放大镜</span>
       <div class="toggle" id="magnifierToggle" onclick="toggleMagnifier(this)"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="magnify-btn" onclick="toggleAlignMode(this)" id="alignBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6m11-11h-6M7 12H1"/><path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24m0-9.9-4.24 4.24m-5.66 5.66-4.24 4.24"/></svg>
+        对齐校准
+      </button>
     </div>
     <div class="condition-tags" id="conditionTags">
       <div class="cond-tag" data-cond="红肿" onclick="toggleCond(this)">红肿</div>
@@ -478,7 +508,9 @@ body{display:flex;flex-direction:column;height:100%}
     </button>
     <h2 id="detailName">患者详情</h2>
   </div>
+  <div id="detailStatusCard"></div>
   <div class="detail-info" id="detailInfo"></div>
+  <div id="followupHistorySection"></div>
   <div class="quick-actions">
     <button class="quick-action" onclick="goToTimeline();closeDetail()">
       <svg viewBox="0 0 24 24"><path d="M23 8c0 1.1-.9 2-2 2-.18 0-.35-.02-.51-.07l-3.56 3.55c.05.16.07.34.07.52 0 1.1-.9 2-2 2s-2-.9-2-2c0-.18.02-.36.07-.52l-2.55-2.55c-.16.05-.34.07-.52.07s-.36-.02-.52-.07l-4.55 4.56c.05.16.07.33.07.51 0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2c.18 0 .35.02.51.07l4.56-4.55C8.02 9.36 8 9.18 8 9c0-1.1.9-2 2-2s2 .9 2 2c0 .18-.02.36-.07.52l2.55 2.55c.16-.05.34-.07.52-.07s.36.02.52.07l3.55-3.56C19.02 8.35 19 8.18 19 8c0-1.1.9-2 2-2s2 .9 2 2z"/></svg>
@@ -700,6 +732,10 @@ var currentSliderPos=50;
 var currentOverlayOpacity=50;
 var todoStatuses={};
 var pendingReminderPatient=null;
+var alignmentData={};
+var alignModeOn=false;
+var draggingAlignPoint=null;
+var followupHistory={};
 var savedNotes=localStorage.getItem('mh_notes');
 if(savedNotes)try{notes=JSON.parse(savedNotes)}catch(e){}
 var savedReminders=localStorage.getItem('mh_reminders');
@@ -708,6 +744,10 @@ var savedStatuses=localStorage.getItem('mh_patient_statuses');
 if(savedStatuses)try{var sm=JSON.parse(savedStatuses);patients.forEach(function(p){if(sm[p.id])p.status=sm[p.id]})}catch(e){}
 var savedTodos=localStorage.getItem('mh_todo_statuses');
 if(savedTodos)try{todoStatuses=JSON.parse(savedTodos)}catch(e){}
+var savedAlign=localStorage.getItem('mh_alignment_data');
+if(savedAlign)try{alignmentData=JSON.parse(savedAlign)}catch(e){}
+var savedFollowup=localStorage.getItem('mh_followup_history');
+if(savedFollowup)try{followupHistory=JSON.parse(savedFollowup)}catch(e){}
 
 var pageTitles={pagePatients:'我的患者',pageTimeline:'疗程时间线',pageCompare:'拍摄对比',pageNotes:'医嘱备注',pageReminders:'复诊提醒',pagePrivacy:'隐私设置'};
 
@@ -770,18 +810,53 @@ function selectProject(el){
 
 function filterPatients(){renderPatients()}
 
+function renderFollowupHistoryList(pid){
+  var history=followupHistory[pid];
+  if(!history||history.length===0){
+    return '<p style="padding:12px 16px;color:var(--text3);font-size:13px;text-align:center;">暂无回访记录</p>';
+  }
+  var actionColors={'called':'background:#D1FAE5;color:#065F46','no-answer':'background:#FEF3C7;color:#92400E','appointed':'background:#DBEAFE;color:#1E40AF'};
+  var html='';
+  history.forEach(function(h){
+    html+='<div class="followup-history-item">'+
+      '<div class="followup-history-header">'+
+        '<span class="followup-history-action" style="'+(actionColors[h.action]||'')+'">'+h.actionLabel+'</span>'+
+        '<span class="followup-history-time">'+h.date+' '+h.time+'</span>'+
+      '</div>'+
+      (h.note?'<div class="followup-history-note">'+h.note+'</div>':'')+
+    '</div>';
+  });
+  return html;
+}
+
 function openDetail(id){
   var p=patients.find(function(x){return x.id===id});
   if(!p)return;
   currentPatient=p;
   document.getElementById('detailName').textContent=p.name;
+  var nextReminder=reminders.find(function(r){return r.patient===p.name&&r.status==='即将到诊'});
+  var lastFollowUp=followupHistory[p.id]?followupHistory[p.id][0]:null;
+  var statusCardHtml='<div class="detail-status-card">'+
+    '<span class="detail-status-badge" style="background:'+(p.status==='恢复中'?'#FEF3C7;color:#D97706':p.status==='需回访'?'#FEE2E2;color:#DC2626':'#D1FAE5;color:#059669')+'">'+p.status+'</span>'+
+    '<div class="detail-meta-row">'+
+      '<span class="detail-meta-label">下次复诊</span>'+
+      '<span class="detail-meta-value">'+(nextReminder?nextReminder.date+' · '+nextReminder.project+' · '+nextReminder.note:'暂无安排')+'</span>'+
+    '</div>'+
+    '<div class="detail-meta-row">'+
+      '<span class="detail-meta-label">最近回访</span>'+
+      '<span class="detail-meta-value">'+(lastFollowUp?lastFollowUp.date+' '+lastFollowUp.time+' · '+lastFollowUp.actionLabel:'暂无回访记录')+'</span>'+
+    '</div>'+
+  '</div>';
+  document.getElementById('detailStatusCard').innerHTML=statusCardHtml;
   document.getElementById('detailInfo').innerHTML=
     '<div class="detail-row"><span class="label">姓名</span><span>'+p.name+'</span></div>'+
     '<div class="detail-row"><span class="label">项目</span><span>'+p.project+'</span></div>'+
-    '<div class="detail-row"><span class="label">状态</span><span class="badge '+getStatusClass(p.status)+'">'+p.status+'</span></div>'+
     '<div class="detail-row"><span class="label">年龄</span><span>'+p.age+'岁</span></div>'+
     '<div class="detail-row"><span class="label">电话</span><span>'+p.phone+'</span></div>'+
     '<div class="detail-row"><span class="label">上次就诊</span><span>'+p.lastVisit+'</span></div>';
+  var historyHtml='<div class="section-title" style="padding:8px 16px 4px;">回访记录</div>'+
+    '<div id="followupHistoryList">'+renderFollowupHistoryList(p.id)+'</div>';
+  document.getElementById('followupHistorySection').innerHTML=historyHtml;
   renderDetailTimeline(p);
   document.getElementById('patientDetail').classList.add('open');
 }
@@ -871,17 +946,28 @@ function selectDay(el){
   renderCompare();
 }
 
+function getAlignKey(){return currentPatient.id+'_'+currentDay;}
+function getAlignment(){return alignmentData[getAlignKey()];}
+function applyAlignmentOffset(container,afterEl,containerWidth,containerHeight){
+  var align=getAlignment();
+  if(align&&afterEl){
+    var dx=(align.afterX-align.beforeX)*containerWidth;
+    var dy=(align.afterY-align.beforeY)*containerHeight;
+    afterEl.style.transform='translate('+(-dx)+'px,'+(-dy)+'px)';
+  }
+}
 function renderCompare(){
   buildPatientChipsSimple('comparePatientChips','compare');
   var html='';
+  var align=getAlignment();
   if(compareMode==='slider'){
     var sliderHtml =
       '<div class="compare-img-container" id="sliderContainer" style="position:relative;width:100%;aspect-ratio:4/5;border-radius:12px;overflow:hidden;">'
-      + '<div class="img-before" style="position:absolute;inset:0;background:linear-gradient(135deg,#4338CA,#6366F1);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,0.9);">'
+      + '<div class="img-before" id="imgBeforeSlider" style="position:absolute;inset:0;background:linear-gradient(135deg,#4338CA,#6366F1);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,0.9);">'
         + '<span class="img-label" style="position:absolute;top:8px;left:8px;padding:3px 10px;border-radius:12px;background:rgba(0,0,0,0.45);color:#fff;font-size:12px;font-weight:600;">术前 D0</span>'
         + '<span style="opacity:0.6;">术前参考图</span>'
       + '</div>'
-      + '<div class="img-after" style="position:absolute;inset:0;background:linear-gradient(135deg,#059669,#34D399);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,0.9);clip-path:inset(0 0 0 ' + currentSliderPos + '%);">'
+      + '<div class="img-after" id="imgAfterSlider" style="position:absolute;inset:0;background:linear-gradient(135deg,#059669,#34D399);display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,0.9);clip-path:inset(0 0 0 ' + currentSliderPos + '%);">'
         + '<span class="img-label" style="position:absolute;top:8px;right:8px;padding:3px 10px;border-radius:12px;background:#2563EB;color:#fff;font-size:12px;font-weight:600;">术后 D' + currentDay + '</span>'
         + '<span style="opacity:0.6;">术后参考图</span>'
       + '</div>'
@@ -891,26 +977,148 @@ function renderCompare(){
       + '<div class="slider-handle" id="sliderHandle" style="position:absolute;top:50%;left:' + currentSliderPos + '%;width:40px;height:40px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,0.25);transform:translate(-50%,-50%);cursor:ew-resize;z-index:5;display:flex;align-items:center;justify-content:center;">'
         + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline><polyline points="9 18 15 12 9 6"></polyline></svg>'
       + '</div>'
+      + '<div class="align-point before" id="alignBefore"></div>'
+      + '<div class="align-point after" id="alignAfter"></div>'
+      + (alignModeOn?'<div class="align-hint">拖动红点和蓝点对齐解剖特征</div>':'')
       + '</div>';
     html+='<div class="compare-area">'+sliderHtml+'</div>';
   }else if(compareMode==='overlay'){
     var beforeOpacity=(100-currentOverlayOpacity)/100;
     var afterOpacity=currentOverlayOpacity/100;
-    html+='<div class="compare-area"><div class="compare-img-container">'+
-      '<div class="img-before" style="opacity:'+beforeOpacity+'"><span class="img-label" style="left:8px">术前 D0</span></div>'+
-      '<div class="img-after" style="opacity:'+afterOpacity+'"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
+    html+='<div class="compare-area"><div class="compare-img-container" id="overlayContainer">'+
+      '<div class="img-before" id="imgBeforeOverlay" style="opacity:'+beforeOpacity+'"><span class="img-label" style="left:8px">术前 D0</span></div>'+
+      '<div class="img-after" id="imgAfterOverlay" style="opacity:'+afterOpacity+'"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
       '<div class="magnifier-lens" id="magnifierLens"></div>'+
+      '<div class="align-point before" id="alignBefore"></div>'+
+      '<div class="align-point after" id="alignAfter"></div>'+
+      (alignModeOn?'<div class="align-hint">拖动红点和蓝点对齐解剖特征</div>':'')+
     '</div>'+
     '<div class="opacity-control"><span>术前</span><input type="range" min="0" max="100" value="'+currentOverlayOpacity+'" id="opacitySlider" oninput="updateOverlay(this)"><span>术后</span></div></div>';
   }else{
+    var beforeX=align?align.beforeX*100:50;
+    var beforeY=align?align.beforeY*100:50;
+    var afterX=align?align.afterX*100:50;
+    var afterY=align?align.afterY*100:50;
     html+='<div class="side-by-side">'+
-      '<div class="side before-side"><span class="side-label">术前 D0</span>术前<div class="magnifier-lens" id="magnifierLensBefore"></div></div>'+
-      '<div class="side after-side"><span class="side-label">术后 D'+currentDay+'</span>术后<div class="magnifier-lens" id="magnifierLensAfter"></div></div>'+
+      '<div class="side before-side" id="sideBefore"><span class="side-label">术前 D0</span>术前'+
+        '<div class="magnifier-lens" id="magnifierLensBefore"></div>'+
+        (align&&!alignModeOn?'<div class="align-crosshair-indicator" style="left:'+beforeX+'%;top:'+beforeY+'%;transform:translate(-50%,-50%);"></div>':'')+
+      '</div>'+
+      '<div class="side after-side" id="sideAfter"><span class="side-label">术后 D'+currentDay+'</span>术后'+
+        '<div class="magnifier-lens" id="magnifierLensAfter"></div>'+
+        (align&&!alignModeOn?'<div class="align-crosshair-indicator" style="left:'+afterX+'%;top:'+afterY+'%;transform:translate(-50%,-50%);"></div>':'')+
+      '</div>'+
     '</div>';
   }
   document.getElementById('compareContainer').innerHTML=html;
   if(compareMode==='slider')initSlider();
   initMagnifier();
+  if(alignModeOn&&compareMode!=='side'){
+    setupAlignPoints();
+  }else if(!alignModeOn&&compareMode!=='side'){
+    var container=document.querySelector('.compare-img-container');
+    if(container){
+      var rect=container.getBoundingClientRect();
+      var afterEl=document.querySelector('.img-after');
+      applyAlignmentOffset(container,afterEl,rect.width,rect.height);
+    }
+  }
+  var alignBtn=document.getElementById('alignBtn');
+  if(alignBtn)alignBtn.classList.toggle('active',alignModeOn);
+}
+
+function toggleAlignMode(el){
+  alignModeOn=!alignModeOn;
+  if(el)el.classList.toggle('active',alignModeOn);
+  if(!alignModeOn){
+    var before=document.getElementById('alignBefore');
+    var after=document.getElementById('alignAfter');
+    var container=document.querySelector('.compare-img-container');
+    if(before&&after&&container){
+      var rect=container.getBoundingClientRect();
+      var bStyle=window.getComputedStyle(before);
+      var aStyle=window.getComputedStyle(after);
+      var bX=parseFloat(before.style.left)/rect.width;
+      var bY=parseFloat(before.style.top)/rect.height;
+      var aX=parseFloat(after.style.left)/rect.width;
+      var aY=parseFloat(after.style.top)/rect.height;
+      if(isNaN(bX))bX=0.5;if(isNaN(bY))bY=0.5;
+      if(isNaN(aX))aX=0.5;if(isNaN(aY))aY=0.5;
+      alignmentData[getAlignKey()]={beforeX:bX,beforeY:bY,afterX:aX,afterY:aY};
+      localStorage.setItem('mh_alignment_data',JSON.stringify(alignmentData));
+      showToast('对齐已保存');
+    }
+  }
+  renderCompare();
+}
+
+function setupAlignPoints(){
+  var before=document.getElementById('alignBefore');
+  var after=document.getElementById('alignAfter');
+  var container=document.querySelector('.compare-img-container');
+  if(!before||!after||!container)return;
+  var align=getAlignment();
+  var rect=container.getBoundingClientRect();
+  var bX=align?align.beforeX*rect.width:rect.width*0.4;
+  var bY=align?align.beforeY*rect.height:rect.height*0.5;
+  var aX=align?align.afterX*rect.width:rect.width*0.6;
+  var aY=align?align.afterY*rect.height:rect.height*0.5;
+  before.style.left=bX+'px';
+  before.style.top=bY+'px';
+  before.style.display='block';
+  after.style.left=aX+'px';
+  after.style.top=aY+'px';
+  after.style.display='block';
+  before.addEventListener('mousedown',function(e){startAlignDrag(e,'before')});
+  after.addEventListener('mousedown',function(e){startAlignDrag(e,'after')});
+  before.addEventListener('touchstart',function(e){startAlignDrag(e,'before')},{passive:false});
+  after.addEventListener('touchstart',function(e){startAlignDrag(e,'after')},{passive:false});
+}
+
+function startAlignDrag(e,which){
+  e.preventDefault();
+  e.stopPropagation();
+  draggingAlignPoint=which;
+  var el=document.getElementById(which==='before'?'alignBefore':'alignAfter');
+  if(el)el.classList.add('dragging');
+  document.addEventListener('mousemove',onAlignDrag);
+  document.addEventListener('touchmove',onAlignDragTouch,{passive:false});
+  document.addEventListener('mouseup',endAlignDrag);
+  document.addEventListener('touchend',endAlignDrag);
+}
+
+function onAlignDrag(e){
+  if(!draggingAlignPoint)return;
+  updateAlignPoint(e.clientX,e.clientY);
+}
+
+function onAlignDragTouch(e){
+  if(!draggingAlignPoint||!e.touches.length)return;
+  e.preventDefault();
+  updateAlignPoint(e.touches[0].clientX,e.touches[0].clientY);
+}
+
+function updateAlignPoint(cx,cy){
+  var container=document.querySelector('.compare-img-container');
+  var el=document.getElementById(draggingAlignPoint==='before'?'alignBefore':'alignAfter');
+  if(!container||!el)return;
+  var rect=container.getBoundingClientRect();
+  var x=Math.max(0,Math.min(rect.width,cx-rect.left));
+  var y=Math.max(0,Math.min(rect.height,cy-rect.top));
+  el.style.left=x+'px';
+  el.style.top=y+'px';
+}
+
+function endAlignDrag(){
+  if(draggingAlignPoint){
+    var el=document.getElementById(draggingAlignPoint==='before'?'alignBefore':'alignAfter');
+    if(el)el.classList.remove('dragging');
+  }
+  draggingAlignPoint=null;
+  document.removeEventListener('mousemove',onAlignDrag);
+  document.removeEventListener('touchmove',onAlignDragTouch);
+  document.removeEventListener('mouseup',endAlignDrag);
+  document.removeEventListener('touchend',endAlignDrag);
 }
 
 function updateOverlay(el){
@@ -982,7 +1190,6 @@ function doMag(cx,cy,container){
   var lensSize=120;
   var BEFORE_GRAD='linear-gradient(135deg,#4338CA,#6366F1)';
   var AFTER_GRAD='linear-gradient(135deg,#059669,#34D399)';
-  var BLEND_GRAD='linear-gradient(135deg,#4338CA 0%,#3B82F6 50%,#34D399 100%)';
   var bg=AFTER_GRAD;
   var label='';
   if(compareMode==='slider'){
@@ -991,7 +1198,18 @@ function doMag(cx,cy,container){
     bg=leftSide?BEFORE_GRAD:AFTER_GRAD;
     label=leftSide?'术前':'术后';
   }else if(compareMode==='overlay'){
-    bg=BLEND_GRAD;
+    var blendPct=currentOverlayOpacity;
+    var r1=67,g1=56,b1=202;
+    var r2=5,g2=150,b2=105;
+    var r=Math.round(r1+(r2-r1)*blendPct/100);
+    var g=Math.round(g1+(g2-g1)*blendPct/100);
+    var b=Math.round(b1+(b2-b1)*blendPct/100);
+    var r1_2=99,g1_2=102,b1_2=241;
+    var r2_2=52,g2_2=211,b2_2=153;
+    var r2m=Math.round(r1_2+(r2_2-r1_2)*blendPct/100);
+    var g2m=Math.round(g1_2+(g2_2-g1_2)*blendPct/100);
+    var b2m=Math.round(b1_2+(b2_2-b1_2)*blendPct/100);
+    bg='linear-gradient(135deg,rgb('+r+','+g+','+b+') 0%,rgb('+r2m+','+g2m+','+b2m+') 100%)';
     label='透明度 '+currentOverlayOpacity+'%';
   }else if(compareMode==='side'){
     if(container.classList.contains('before-side')||container.classList.contains('img-before')){
@@ -1295,9 +1513,30 @@ function renderTodos(){
   if(badge)badge.textContent=todoPatients.length;
 }
 
+function addFollowupHistory(pid,action,note){
+  var actionLabels={'called':'已联系','no-answer':'未接通','appointed':'已预约复诊'};
+  var now=new Date();
+  var entry={
+    id:Date.now(),
+    action:action,
+    actionLabel:actionLabels[action]||action,
+    date:now.toISOString().slice(0,10),
+    time:now.toTimeString().slice(0,5),
+    note:note||'',
+    timestamp:Date.now()
+  };
+  if(!followupHistory[pid])followupHistory[pid]=[];
+  followupHistory[pid].unshift(entry);
+  localStorage.setItem('mh_followup_history',JSON.stringify(followupHistory));
+}
+
 function handleTodoAction(pid,action){
   var p=patients.find(function(x){return x.id===pid});
   if(!p)return;
+  var note=prompt('备注（可选）：','');
+  if(note===null)note='';
+  note=note.trim();
+  addFollowupHistory(pid,action,note);
   if(action==='called'){p.status='正常';delete todoStatuses[pid]}
   else if(action==='no-answer'){todoStatuses[pid]='no-answer'}
   else if(action==='appointed'){
