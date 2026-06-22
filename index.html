@@ -224,6 +224,36 @@ body{display:flex;flex-direction:column;height:100%}
 .empty-state p{font-size:13px}
 .filter-row{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;scrollbar-width:none}
 .filter-row::-webkit-scrollbar{display:none}
+.magnifier-lens{position:absolute;width:120px;height:120px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.1),0 4px 12px rgba(0,0,0,.3);pointer-events:none;display:none;z-index:20;background-repeat:no-repeat}
+.case-presentation{position:fixed;inset:0;background:#000;z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;padding:20px}
+.case-presentation.open{display:flex}
+.case-pres-header{position:absolute;top:0;left:0;right:0;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(rgba(0,0,0,.7),transparent);z-index:1}
+.case-pres-close{padding:8px 16px;border-radius:8px;background:rgba(255,255,255,.15);border:none;color:#fff;cursor:pointer;font-size:14px;font-family:inherit}
+.case-pres-info{text-align:center;margin-bottom:20px}
+.case-pres-info h3{font-size:20px;margin-bottom:4px}
+.case-pres-info p{font-size:14px;opacity:.7}
+.case-slide{width:90%;max-width:500px;text-align:center;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.case-slide-date{font-size:14px;color:var(--primary-light);font-weight:600;margin-bottom:4px}
+.case-slide-label{font-size:18px;font-weight:600;margin-bottom:16px}
+.case-slide-photos{display:flex;gap:10px;justify-content:center;margin-bottom:16px}
+.case-slide-photo{width:100px;height:130px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.8}
+.case-slide-photo.front{background:linear-gradient(135deg,#E0E7FF,#C7D2FE);color:#4338CA}
+.case-slide-photo.deg45{background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB}
+.case-slide-photo.deg90{background:linear-gradient(135deg,#E0F2FE,#BAE6FD);color:#0284C7}
+.case-slide-tags{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.case-slide-tags span{padding:3px 10px;border-radius:12px;font-size:11px;background:rgba(255,255,255,.15)}
+.case-slide-note{font-size:14px;line-height:1.6;opacity:.9;background:rgba(255,255,255,.08);padding:12px 16px;border-radius:8px;margin-bottom:12px}
+.case-slide-private{font-size:12px;opacity:.5;margin-bottom:8px}
+.case-pres-nav{display:flex;align-items:center;gap:16px;margin-top:20px}
+.case-pres-nav button{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
+.case-pres-nav button:disabled{opacity:.3;cursor:default}
+.case-pres-dots{display:flex;gap:6px}
+.case-pres-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3);border:none;cursor:pointer;transition:background .2s}
+.case-pres-dot.active{background:#fff}
+.case-pres-autoplay{margin-top:12px;padding:6px 16px;border-radius:16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;cursor:pointer;font-size:12px;font-family:inherit}
+.case-pres-autoplay.playing{background:var(--primary);border-color:var(--primary)}
+.case-pres-privacy{font-size:11px;opacity:.4;margin-top:16px}
 @media(min-width:768px){
   .stats-row{gap:12px}
   .stat-card{padding:14px 12px}
@@ -445,6 +475,10 @@ body{display:flex;flex-direction:column;height:100%}
       <svg viewBox="0 0 24 24"><path d="M9 13h-2v-2h2v2zm4-2h-2v2h2v-2zm4 0h-2v2h2v-2zm4-5H3v16h18V6zm-2 14H5V9h14v11z"/></svg>
       拍摄
     </button>
+    <button class="quick-action" onclick="openCasePresentation()">
+      <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9.5 12.5l2.5 3 3.5-4.5 4.5 6H4l5.5-4.5z"/></svg>
+      讲解
+    </button>
   </div>
   <div class="timeline-section" style="margin:0 16px 16px">
     <h3>近期时间线</h3>
@@ -537,6 +571,24 @@ body{display:flex;flex-direction:column;height:100%}
   <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveReminder()">保存提醒</button>
 </div>
 
+<div class="case-presentation" id="casePresentation">
+  <div class="case-pres-header">
+    <div></div>
+    <button class="case-pres-close" onclick="closeCasePresentation()">退出讲解</button>
+  </div>
+  <div class="case-pres-info">
+    <h3 id="casePresName"></h3>
+    <p id="casePresProject"></p>
+  </div>
+  <div id="caseSlideContent" class="case-slide"></div>
+  <div class="case-pres-nav">
+    <button id="casePrevBtn" onclick="casePrev()">&#9664;</button>
+    <div class="case-pres-dots" id="caseDots"></div>
+    <button id="caseNextBtn" onclick="caseNext()">&#9654;</button>
+  </div>
+  <button class="case-pres-autoplay" id="caseAutoPlayBtn" onclick="toggleCaseAutoPlay()">▶ 自动播放</button>
+  <div class="case-pres-privacy">🔒 适合展示内容 · 私密备注已隐藏</div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -619,6 +671,12 @@ var currentDay=7;
 var noteFilter='all';
 var reminderFilter='all';
 var sliderPos=50;
+var savedNotes=localStorage.getItem('mh_notes');
+if(savedNotes)try{notes=JSON.parse(savedNotes)}catch(e){}
+var savedReminders=localStorage.getItem('mh_reminders');
+if(savedReminders)try{reminders=JSON.parse(savedReminders)}catch(e){}
+var savedStatuses=localStorage.getItem('mh_patient_statuses');
+if(savedStatuses)try{var sm=JSON.parse(savedStatuses);patients.forEach(function(p){if(sm[p.id])p.status=sm[p.id]})}catch(e){}
 
 var pageTitles={pagePatients:'我的患者',pageTimeline:'疗程时间线',pageCompare:'拍摄对比',pageNotes:'医嘱备注',pageReminders:'复诊提醒',pagePrivacy:'隐私设置'};
 
@@ -793,21 +851,24 @@ function renderCompare(){
       '<div class="slider-handle" id="sliderHandle" style="left:'+sliderPos+'%">'+
         '<svg viewBox="0 0 24 24"><path d="M8 5l-5 7 5 7zm8 0l5 7-5 7z"/></svg>'+
       '</div>'+
+      '<div class="magnifier-lens" id="magnifierLens"></div>'+
     '</div></div>';
   }else if(compareMode==='overlay'){
     html+='<div class="compare-area"><div class="compare-img-container">'+
       '<div class="img-before" style="opacity:0.5"><span class="img-label" style="left:8px">术前 D0</span></div>'+
       '<div class="img-after" style="opacity:0.5"><span class="img-label" style="right:8px;left:auto">术后 D'+currentDay+'</span></div>'+
+      '<div class="magnifier-lens" id="magnifierLens"></div>'+
     '</div>'+
     '<div class="opacity-control"><span>术前</span><input type="range" min="0" max="100" value="50" id="opacitySlider" oninput="updateOverlay(this)"><span>术后</span></div></div>';
   }else{
     html+='<div class="side-by-side">'+
-      '<div class="side before-side"><span class="side-label">术前 D0</span>术前</div>'+
-      '<div class="side after-side"><span class="side-label">术后 D'+currentDay+'</span>术后</div>'+
+      '<div class="side before-side"><span class="side-label">术前 D0</span>术前<div class="magnifier-lens" id="magnifierLensBefore"></div></div>'+
+      '<div class="side after-side"><span class="side-label">术后 D'+currentDay+'</span>术后<div class="magnifier-lens" id="magnifierLensAfter"></div></div>'+
     '</div>';
   }
   document.getElementById('compareContainer').innerHTML=html;
   if(compareMode==='slider')initSlider();
+  initMagnifier();
 }
 
 function updateOverlay(el){
@@ -846,9 +907,71 @@ function initSlider(){
   document.addEventListener('touchend',onEnd);
 }
 
-function toggleMagnifier(el){el.classList.toggle('on');showToast(el.classList.contains('on')?'放大镜已开启':'放大镜已关闭')}
+function initMagnifier(){
+  var containers=document.querySelectorAll('.compare-img-container,.side');
+  containers.forEach(function(c){
+    c.removeEventListener('mousemove',handleMag);
+    c.removeEventListener('touchmove',handleMagTouch);
+    c.removeEventListener('mouseleave',hideMag);
+    if(magnifierOn){
+      c.addEventListener('mousemove',handleMag);
+      c.addEventListener('touchmove',handleMagTouch,{passive:true});
+      c.addEventListener('mouseleave',hideMag);
+    }
+  });
+}
+function hideMag(){var l=document.getElementById('magnifierLens');if(l)l.style.display='none';var lb=document.getElementById('magnifierLensBefore');if(lb)lb.style.display='none';var la=document.getElementById('magnifierLensAfter');if(la)la.style.display='none'}
+function handleMag(e){doMag(e.clientX,e.clientY,e.currentTarget)}
+function handleMagTouch(e){if(e.touches.length)doMag(e.touches[0].clientX,e.touches[0].clientY,e.currentTarget)}
+function doMag(cx,cy,container){
+  var lensId='magnifierLens';
+  if(container.classList.contains('before-side'))lensId='magnifierLensBefore';
+  if(container.classList.contains('after-side'))lensId='magnifierLensAfter';
+  var lens=document.getElementById(lensId);
+  if(!lens||!magnifierOn)return;
+  var rect=container.getBoundingClientRect();
+  var x=cx-rect.left;
+  var y=cy-rect.top;
+  if(x<0||x>rect.width||y<0||y>rect.height){lens.style.display='none';return}
+  lens.style.display='block';
+  lens.style.left=(x-60)+'px';
+  lens.style.top=(y-60)+'px';
+  var bg='linear-gradient(135deg,#059669,#34D399)';
+  if(container.classList.contains('before-side')||container.classList.contains('img-before')){bg='linear-gradient(135deg,#4338CA,#6366F1)'}
+  if(compareMode==='slider'&&lensId==='magnifierLens'){
+    var pct=x/rect.width*100;
+    bg=pct<sliderPos?'linear-gradient(135deg,#059669,#34D399)':'linear-gradient(135deg,#4338CA,#6366F1)';
+  }
+  if(compareMode==='overlay'&&lensId==='magnifierLens'){bg='linear-gradient(135deg,#4338CA,#34D399)'}
+  lens.style.background=bg;
+  lens.style.backgroundSize=(rect.width*2.5)+'px '+(rect.height*2.5)+'px';
+  lens.style.backgroundPosition=(-(x*2.5-60))+'px '+(-(y*2.5-60))+'px';
+  lens.style.backgroundRepeat='no-repeat';
+}
+
+var magnifierOn=false;
+function toggleMagnifier(el){
+  el.classList.toggle('on');
+  magnifierOn=el.classList.contains('on');
+  if(!magnifierOn){
+    var lens=document.getElementById('magnifierLens');
+    if(lens)lens.style.display='none';
+  }
+  initMagnifier();
+  showToast(magnifierOn?'放大镜已开启 · 在照片上拖动查看细节':'放大镜已关闭');
+}
 function toggleCond(el){el.classList.toggle('active');showToast(el.classList.contains('active')?'已标记: '+el.dataset.cond:'已取消: '+el.dataset.cond)}
-function quickMark(msg){showToast('已标记: '+msg)}
+function quickMark(msg){
+  var p=currentPatient;
+  if(msg==='需电话回访'){p.status='需回访'}
+  else if(msg==='恢复正常'){p.status='正常'}
+  var statusMap={};patients.forEach(function(pp){statusMap[pp.id]=pp.status});
+  localStorage.setItem('mh_patient_statuses',JSON.stringify(statusMap));
+  renderPatients();
+  if(document.getElementById('patientDetail').classList.contains('open')){openDetail(p.id)}
+  renderReminders();
+  showToast(p.name+' 已标记为: '+msg);
+}
 
 function renderNotes(){
   var filtered=notes.filter(function(n){
@@ -942,6 +1065,7 @@ function saveNote(){
   var hasSync=document.getElementById('noteSyncToggle').classList.contains('on');
   var syncContent=hasSync?document.getElementById('noteSyncContent').value:null;
   notes.unshift({id:notes.length+1,type:type,patient:patient,date:new Date().toISOString().slice(0,10),content:content,isPrivate:isPriv,sync:syncContent});
+  localStorage.setItem('mh_notes',JSON.stringify(notes));
   closeAddNote();
   renderNotes();
   showToast('备注已保存');
@@ -967,6 +1091,7 @@ function saveReminder(){
   var note=document.getElementById('reminderNote').value;
   if(!date){showToast('请选择日期');return}
   reminders.unshift({id:reminders.length+1,patient:patient,project:project,date:date,status:'即将到诊',note:note||'待确认',talking:null});
+  localStorage.setItem('mh_reminders',JSON.stringify(reminders));
   closeAddReminder();
   renderReminders();
   showToast('提醒已保存');
@@ -983,6 +1108,51 @@ function openPresentationMode(){
 function closePresentationMode(){document.getElementById('presentationMode').classList.remove('open')}
 
 function togglePrivacy(el){el.classList.toggle('on')}
+
+var caseSlideIdx=0;
+var caseAutoTimer=null;
+function openCasePresentation(){
+  closeDetail();
+  caseSlideIdx=0;
+  renderCaseSlide();
+  document.getElementById('casePresentation').classList.add('open');
+}
+function closeCasePresentation(){
+  document.getElementById('casePresentation').classList.remove('open');
+  if(caseAutoTimer){clearInterval(caseAutoTimer);caseAutoTimer=null}
+}
+function renderCaseSlide(){
+  var p=currentPatient;
+  var tl=p.timeline;
+  var s=tl[caseSlideIdx];
+  if(!s)return;
+  document.getElementById('casePresName').textContent=p.name;
+  document.getElementById('casePresProject').textContent=p.project+' · 疗程进展';
+  var h='<div class="case-slide-date">'+s.date+' · Day '+s.day+'</div>';
+  h+='<div class="case-slide-label">'+s.label+'</div>';
+  h+='<div class="case-slide-photos">';
+  h+='<div class="case-slide-photo front">正面</div>';
+  h+='<div class="case-slide-photo deg45">45°</div>';
+  h+='<div class="case-slide-photo deg90">90°</div>';
+  h+='</div>';
+  h+='<div class="case-slide-tags">'+s.tags.map(function(t){return'<span>'+t+'</span>'}).join('')+'</div>';
+  if(s.note){h+='<div class="case-slide-note">'+s.note+'</div>'}
+  else{h+='<div class="case-slide-private">暂无备注</div>'}
+  document.getElementById('caseSlideContent').innerHTML=h;
+  document.getElementById('casePrevBtn').disabled=caseSlideIdx===0;
+  document.getElementById('caseNextBtn').disabled=caseSlideIdx===tl.length-1;
+  var dots='';
+  tl.forEach(function(_,i){dots+='<div class="case-pres-dot'+(i===caseSlideIdx?' active':'')+'" onclick="goCaseSlide('+i+')"></div>'});
+  document.getElementById('caseDots').innerHTML=dots;
+}
+function caseNext(){if(caseSlideIdx<currentPatient.timeline.length-1){caseSlideIdx++;renderCaseSlide()}}
+function casePrev(){if(caseSlideIdx>0){caseSlideIdx--;renderCaseSlide()}}
+function goCaseSlide(i){caseSlideIdx=i;renderCaseSlide()}
+function toggleCaseAutoPlay(){
+  var btn=document.getElementById('caseAutoPlayBtn');
+  if(caseAutoTimer){clearInterval(caseAutoTimer);caseAutoTimer=null;btn.textContent='▶ 自动播放';btn.classList.remove('playing')}
+  else{caseAutoTimer=setInterval(function(){if(caseSlideIdx<currentPatient.timeline.length-1){caseSlideIdx++;renderCaseSlide()}else{clearInterval(caseAutoTimer);caseAutoTimer=null;document.getElementById('caseAutoPlayBtn').textContent='▶ 自动播放';document.getElementById('caseAutoPlayBtn').classList.remove('playing')}},3000);btn.textContent='⏸ 暂停播放';btn.classList.add('playing')}
+}
 
 function showToast(msg){
   var t=document.getElementById('toast');
